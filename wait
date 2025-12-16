@@ -1,0 +1,234 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
+
+-- Clear any previous instance
+local existing = PlayerGui:FindFirstChild("ModernDiscordPopup")
+if existing then
+    existing:Destroy()
+end
+
+-- ScreenGui setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ModernDiscordPopup"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = PlayerGui
+
+-- Main Frame (glassy / transparent)
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 450, 0, 200)
+frame.Position = UDim2.new(0.5, -225, -0.5, -100) -- start off-screen (top)
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BackgroundTransparency = 0.6 -- transparent glass look
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+frame.ClipsDescendants = true
+frame.Name = "MainFrame"
+
+-- Rounded corners
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = frame
+
+-- Subtle border stroke
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 1.5
+stroke.Color = Color3.fromRGB(100, 107, 240) -- soft blurple
+stroke.Transparency = 0.4
+stroke.Parent = frame
+
+-- Frosted gradient to enhance glass feel
+local grad = Instance.new("UIGradient")
+grad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(200,200,200))
+}
+grad.Transparency = NumberSequence.new{
+    NumberSequenceKeypoint.new(0, 0.9),
+    NumberSequenceKeypoint.new(1, 1)
+}
+grad.Rotation = 90
+grad.Parent = frame
+
+-- Soft shadow behind the frame (subtle)
+local shadow = Instance.new("ImageLabel")
+shadow.Name = "Shadow"
+shadow.Size = UDim2.new(1.12, 0, 1.12, 0)
+shadow.Position = UDim2.new(-0.06, 0, -0.06, 0)
+shadow.AnchorPoint = Vector2.new(0, 0)
+shadow.BackgroundTransparency = 1
+shadow.Image = "rbxassetid://1316045217"
+shadow.ImageTransparency = 0.85
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+shadow.ZIndex = frame.ZIndex - 1
+shadow.Parent = frame
+
+-- Title (AZURE)
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "TitleLabel"
+titleLabel.Size = UDim2.new(1, -30, 0, 30)
+titleLabel.Position = UDim2.new(0, 15, 0, 12)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "AZURE"
+titleLabel.TextColor3 = Color3.fromRGB(100, 107, 240)
+titleLabel.TextSize = 20
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = frame
+
+-- Message
+local textLabel = Instance.new("TextLabel")
+textLabel.Name = "TextLabel"
+textLabel.Size = UDim2.new(1, -40, 0, 68)
+textLabel.Position = UDim2.new(0, 20, 0, 50)
+textLabel.BackgroundTransparency = 1
+textLabel.Text = "This script will load after 5 to 10 seconds if it doesnt load please report it and join the Discord channel for updates and giveaways."
+textLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+textLabel.TextSize = 16
+textLabel.Font = Enum.Font.Gotham
+textLabel.TextWrapped = true
+textLabel.TextYAlignment = Enum.TextYAlignment.Top
+textLabel.Parent = frame
+
+-- Button container
+local buttonContainer = Instance.new("Frame")
+buttonContainer.Name = "ButtonContainer"
+buttonContainer.Size = UDim2.new(1, -40, 0, 44)
+buttonContainer.Position = UDim2.new(0, 20, 0, 135)
+buttonContainer.BackgroundTransparency = 1
+buttonContainer.Parent = frame
+
+local buttonLayout = Instance.new("UIListLayout")
+buttonLayout.FillDirection = Enum.FillDirection.Horizontal
+buttonLayout.Padding = UDim.new(0, 14)
+buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+buttonLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+buttonLayout.Parent = buttonContainer
+
+-- Yes Button (Join Discord)
+local yesButton = Instance.new("TextButton")
+yesButton.Size = UDim2.new(0.45, 0, 1, 0)
+yesButton.BackgroundColor3 = Color3.fromRGB(100, 107, 240)
+yesButton.BackgroundTransparency = 0
+yesButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+yesButton.Text = "Join Discord"
+yesButton.Font = Enum.Font.GothamBold
+yesButton.TextSize = 16
+yesButton.Parent = buttonContainer
+
+local yesCorner = Instance.new("UICorner")
+yesCorner.CornerRadius = UDim.new(0, 8)
+yesCorner.Parent = yesButton
+
+-- No Button (Dismiss)
+local noButton = Instance.new("TextButton")
+noButton.Size = UDim2.new(0.45, 0, 1, 0)
+noButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+noButton.BackgroundTransparency = 0
+noButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+noButton.Text = "Dismiss"
+noButton.Font = Enum.Font.GothamBold
+noButton.TextSize = 16
+noButton.Parent = buttonContainer
+
+local noCorner = Instance.new("UICorner")
+noCorner.CornerRadius = UDim.new(0, 8)
+noCorner.Parent = noButton
+
+-- Hover effect helper
+local function addHoverEffect(button)
+    local original = button.BackgroundColor3
+    local r = math.max(0, original.R * 255 - 18)
+    local g = math.max(0, original.G * 255 - 18)
+    local b = math.max(0, original.B * 255 - 18)
+    local darker = Color3.fromRGB(r, g, b)
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.15), { BackgroundColor3 = darker }):Play()
+    end)
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.15), { BackgroundColor3 = original }):Play()
+    end)
+end
+
+addHoverEffect(yesButton)
+addHoverEffect(noButton)
+
+-- Animations
+local slideInInfo = TweenInfo.new(0.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local slideOutInfo = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+
+-- Slide in
+TweenService:Create(frame, slideInInfo, {
+    Position = UDim2.new(0.5, 0, 0.5, 0)
+}):Play()
+
+-- Button click handlers
+yesButton.MouseButton1Click:Connect(function()
+    -- copy invite to clipboard (will fail silently if not allowed)
+    pcall(function() setclipboard("https://discord.gg/wyZ8CVNM") end)
+
+    -- slide original frame out (up)
+    TweenService:Create(frame, slideOutInfo, {
+        Position = UDim2.new(0.5, 0, -0.5, -100)
+    }):Play()
+
+    wait(0.45)
+
+    -- confirmation popup: clone the main frame so styling is preserved
+    local confirmFrame = frame:Clone()
+    confirmFrame.Name = "ConfirmFrame"
+    confirmFrame.Position = UDim2.new(0.5, 0, -0.5, -100)
+    confirmFrame.Parent = screenGui
+
+    -- update its children (use FindFirstChild to be safe)
+    local cTitle = confirmFrame:FindFirstChild("TitleLabel", true)
+    local cText = confirmFrame:FindFirstChild("TextLabel", true)
+    local cButtons = confirmFrame:FindFirstChild("ButtonContainer", true)
+
+    if cTitle and cText then
+        cTitle.Text = "SUCCESS!"
+        cTitle.TextColor3 = Color3.fromRGB(120, 255, 140)
+        cText.Text = "Discord invite copied to clipboard!\nSee you there!"
+        cText.TextColor3 = Color3.fromRGB(230, 230, 230)
+    end
+
+    if cButtons then
+        cButtons:Destroy() -- remove buttons from confirm popup
+    end
+
+    -- slide in confirmation
+    TweenService:Create(confirmFrame, slideInInfo, {
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    }):Play()
+
+    -- auto-hide after 3 seconds
+    delay(3, function()
+        TweenService:Create(confirmFrame, slideOutInfo, {
+            Position = UDim2.new(0.5, 0, -0.5, -100)
+        }):Play()
+        wait(0.45)
+        if confirmFrame and confirmFrame.Parent then
+            confirmFrame:Destroy()
+        end
+    end)
+
+    -- optionally remove original frame too
+    if frame and frame.Parent then
+        frame:Destroy()
+    end
+end)
+
+noButton.MouseButton1Click:Connect(function()
+    TweenService:Create(frame, slideOutInfo, {
+        Position = UDim2.new(0.5, 0, -0.5, -100)
+    }):Play()
+    delay(0.45, function()
+        if frame and frame.Parent then
+            frame:Destroy()
+        end
+    end)
+end)
