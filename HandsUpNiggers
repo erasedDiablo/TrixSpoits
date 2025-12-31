@@ -1,37 +1,33 @@
--- Fixed Zakori YBA Script
-local WindUI
+--[[
+ ____   __   _  _  ____  ____  ____  ____    ____  _  _    _  _  ____  __ _  _  _    ____  __  ____    ____  ____  ____  ____    _  _  ____  ____ 
+(  _ \ /  \ / )( \(  __)(  _ \(  __)(    \  (  _ \( \/ )  / )( \(  __)(  ( \( \/ )  (  __)/  \(  _ \  (  __)(  _ \(  __)(  __)  / )( \/ ___)(  __)
+ ) __/(  O )\ /\ / ) _)  )   / ) _)  ) D (   ) _ ( )  /   ) __ ( ) _) /    / )  /    ) _)(  O ))   /   ) _)  )   / ) _)  ) _)   ) \/ (\___ \ ) _) 
+(__)   \__/ (_/\_)(____)(__\_)(____)(____/  (____/(__/    \_)(_/(____)\_)__)(__/    (__)  \__/(__\_)  (__)  (__\_)(____)(____)  \____/(____/(____)
+]] 
 
--- Load WindUI with proper error handling
-do
-    local ok, result = pcall(function()
-        return require("./src/Init")
-    end)
-    if ok then
-        WindUI = result
-    else
-        -- Fixed: Removed trailing space from URL
-        local success, ui = pcall(function()
-            return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/dist/main.lua"))()
-        end)
-        if success then
-            WindUI = ui
-        else
-            warn("Failed to load WindUI: " .. tostring(ui))
-            -- Fallback: Create mock WindUI to prevent errors
-            WindUI = {
-                Notify = function() end,
-                CreateWindow = function() return {SetToggleKey = function() end, Tab = function() return {Toggle = function() end} end} end
-            }
-        end
-    end
-end
+-- Load Rayfield Library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+    Name = "Item Collector",
+    LoadingTitle = "Item Collector Script",
+    LoadingSubtitle = "by User",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "ItemCollector",
+        FileName = "Config"
+    }
+})
 
--- Core Variables
-local BuyLucky = false
-local AutoSell = false
-local Hop = false
+-- Create Tabs
+local MainTab = Window:CreateTab("Main", 4483362458)
+local PriorityTab = Window:CreateTab("Priority Items", 4483362458)
+local SellTab = Window:CreateTab("Sell Items", 4483362458)
 
-local PriorityItems = {
+-- Configuration Variables
+getgenv().BuyLucky = true
+getgenv().AutoSell = true
+getgenv().Hop = false
+getgenv().PriorityItems = {
     "Lucky Arrow",
     "Lucky Stone Mask",
     "Green Candy",
@@ -39,8 +35,7 @@ local PriorityItems = {
     "Blue Candy",
     "Yellow Candy"
 }
-
-local SellItems = {
+getgenv().SellItems = {
     ["Gold Coin"] = true,
     ["Rokakaka"] = true,
     ["Pure Rokakaka"] = true,
@@ -63,506 +58,474 @@ local SellItems = {
     ["Yellow Candy"] = false
 }
 
--- Services
-local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local MarketplaceService = game:GetService("MarketplaceService")
-local TeleportService = game:GetService("TeleportService")
+-- Spawned Items table (used by the collection logic)
+getgenv().SpawnedItems = {}
 
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
+-- ==================== UI CREATION ====================
 
--- Anti-Cheat Bypasses
-game:GetService("CoreGui").DescendantAdded:Connect(function(child)
-    if child.Name == "ErrorPrompt" then
-        local GrabError = child:FindFirstChild("ErrorMessage", true)
-        if not GrabError then return end
-        
-        repeat task.wait() until GrabError.Text ~= "Label"
-        local Reason = GrabError.Text
-        
-        if Reason:match("kick") or Reason:match("You") or Reason:match("conn") or Reason:match("rejoin") then
-            TeleportService:Teleport(2809202155, Player)
+-- Main Tab
+MainTab:CreateSection("Features")
+
+MainTab:CreateToggle({
+    Name = "Buy Lucky Arrows",
+    CurrentValue = getgenv().BuyLucky,
+    Callback = function(Value)
+        getgenv().BuyLucky = Value
+    end,
+    Flag = "BuyLucky"
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Sell Items",
+    CurrentValue = getgenv().AutoSell,
+    Callback = function(Value)
+        getgenv().AutoSell = Value
+    end,
+    Flag = "AutoSell"
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Server Hop",
+    CurrentValue = getgenv().Hop,
+    Callback = function(Value)
+        getgenv().Hop = Value
+    end,
+    Flag = "Hop"
+})
+
+MainTab:CreateSection("Script Control")
+MainTab:CreateToggle({
+    Name = "Enable Script",
+    CurrentValue = false,
+    Callback = function(Value)
+        getgenv().ScriptRunning = Value
+        if Value then
+            task.spawn(RunItemCollector)
+            Rayfield:Notify({Title = "Script Started", Content = "Item collector is now active", Duration = 3})
+        else
+            Rayfield:Notify({Title = "Script Stopped", Content = "Item collector has been disabled", Duration = 3})
+        end
+    end,
+    Flag = "EnableScript"
+})
+
+-- Priority Items Tab
+PriorityTab:CreateSection("Add Item")
+PriorityTab:CreateInput({
+    Name = "New Item Name",
+    PlaceholderText = "Enter item name...",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        if Text ~= "" and not table.find(getgenv().PriorityItems, Text) then
+            table.insert(getgenv().PriorityItems, Text)
+            Rayfield:Notify({Title = "Success", Content = Text .. " added to priority list", Duration = 3})
+        elseif Text ~= "" then
+            Rayfield:Notify({Title = "Info", Content = Text .. " is already in priority items", Duration = 3})
         end
     end
-end)
+})
 
-local Has2x = MarketplaceService:UserOwnsGamePassAsync(Player.UserId, 14597778)
-
--- Fixed: Shortened variable name to prevent potential issues
-local AC_Key = "___XP DE KEY"
-
-local oldNc
-oldNc = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-    local Method = getnamecallmethod()
-    local Args = {...}
-    
-    if not checkcaller() and rawequal(self.Name, "Returner") and rawequal(Args[1], "idklolbrah2de") then
-        return AC_Key
-    end
-    
-    return oldNc(self, ...)
-end))
-
--- Fixed: Added proper check for ItemSpawn script
-local oldMagnitude
-oldMagnitude = hookmetamethod(game.Vector3.new(), "__index", newcclosure(function(self, index)
-    local CallingScript = tostring(getcallingscript())
-    
-    if not checkcaller() and rawequal(index, "magnitude") and CallingScript:find("ItemSpawn") then
-        return 0
-    end
-    
-    return oldMagnitude(self, index)
-end))
-
--- Helper Functions
-local function GetCharacter(Part)
-    if Player.Character then
-        if not Part then
-            return Player.Character
-        elseif typeof(Part) == "string" then
-            return Player.Character:FindFirstChild(Part) or nil
-        end
-    end
-    return nil
-end
-
-local function TeleportTo(Position)
-    local HumanoidRootPart = GetCharacter("HumanoidRootPart")
-    if HumanoidRootPart then
-        local PositionType = typeof(Position)
-        if PositionType == "CFrame" then
-            HumanoidRootPart.CFrame = Position
-        elseif PositionType == "Vector3" then
-            HumanoidRootPart.CFrame = CFrame.new(Position)
-        end
-    end
-end
-
-local function ToggleNoclip(Value)
-    local Character = GetCharacter()
-    if Character then
-        for _, Child in pairs(Character:GetDescendants()) do
-            if Child:IsA("BasePart") and Child.CanCollide == not Value then
-                Child.CanCollide = Value
+PriorityTab:CreateSection("Remove Item")
+PriorityTab:CreateInput({
+    Name = "Item to Remove",
+    PlaceholderText = "Enter item name...",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        if Text ~= "" then
+            local index = table.find(getgenv().PriorityItems, Text)
+            if index then
+                table.remove(getgenv().PriorityItems, index)
+                Rayfield:Notify({Title = "Success", Content = Text .. " removed from priority list", Duration = 3})
+            else
+                Rayfield:Notify({Title = "Error", Content = Text .. " not found in priority items", Duration = 3})
             end
         end
     end
-end
+})
 
-local MaxItemAmounts = {
-    ["Gold Coin"] = 45,
-    ["Rokakaka"] = 25,
-    ["Pure Rokakaka"] = 10,
-    ["Mysterious Arrow"] = 25,
-    ["Diamond"] = 30,
-    ["Ancient Scroll"] = 10,
-    ["Caesar's Headband"] = 10,
-    ["Stone Mask"] = 10,
-    ["Rib Cage of The Saint's Corpse"] = 20,
-    ["Quinton's Glove"] = 10,
-    ["Zeppeli's Hat"] = 10,
-    ["Lucky Arrow"] = 15,
-    ["Lucky Stone Mask"] = 10,
-    ["Clackers"] = 10,
-    ["Steel Ball"] = 10,
-    ["Dio's Diary"] = 10,
-    ["Green Candy"] = 45,
-    ["Red Candy"] = 45,
-    ["Blue Candy"] = 45,
-    ["Yellow Candy"] = 45
-}
-
-if Has2x then
-    for Index, Max in pairs(MaxItemAmounts) do
-        MaxItemAmounts[Index] = Max * 2
+PriorityTab:CreateSection("Current Items")
+PriorityTab:CreateButton({
+    Name = "View Priority Items",
+    Callback = function()
+        local items = table.concat(getgenv().PriorityItems, "\n")
+        Rayfield:Notify({Title = "Priority Items", Content = items, Duration = 5})
     end
+})
+
+-- Sell Items Tab
+SellTab:CreateSection("Item Toggles (Note: Custom items require script restart)")
+
+-- Create toggles for each sellable item
+for itemName, shouldSell in pairs(getgenv().SellItems) do
+    SellTab:CreateToggle({
+        Name = itemName,
+        CurrentValue = shouldSell,
+        Callback = function(Value)
+            getgenv().SellItems[itemName] = Value
+        end,
+        Flag = "Sell_" .. itemName
+    })
 end
 
-local function HasMaxItem(Item)
-    local Count = 0
-    local Backpack = Player:FindFirstChild("Backpack")
-    if not Backpack then return false end
-    
-    for _, Tool in pairs(Backpack:GetChildren()) do
-        if Tool.Name == Item then
-            Count += 1
+SellTab:CreateSection("Add Custom Item")
+SellTab:CreateInput({
+    Name = "Custom Item Name",
+    PlaceholderText = "Enter item name...",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        if Text ~= "" and getgenv().SellItems[Text] == nil then
+            getgenv().SellItems[Text] = true
+            Rayfield:Notify({Title = "Success", Content = Text .. " added to sell items. Restart script to see toggle.", Duration = 3})
+        elseif Text ~= "" then
+            Rayfield:Notify({Title = "Info", Content = Text .. " already exists", Duration = 3})
         end
     end
-    
-    return MaxItemAmounts[Item] and Count >= MaxItemAmounts[Item]
-end
+})
 
-local function HasLuckyArrows()
-    local Count = 0
-    local Backpack = Player:FindFirstChild("Backpack")
-    if not Backpack then return false end
-    
-    for _, Tool in pairs(Backpack:GetChildren()) do
-        if Tool.Name == "Lucky Arrow" then
-            Count += 1
-        end
-    end
-    return Count >= 9
-end
+-- ==================== MAIN SCRIPT LOGIC ====================
 
-local function IsPriorityItem(ItemName)
-    for _, PriorityName in pairs(PriorityItems) do
-        if ItemName == PriorityName then
-            return true
-        end
-    end
-    return false
-end
+function RunItemCollector()
+    -- Wait for game to load
+    wait(4)
 
--- Fixed: Moved GetItemInfo before it's used
-local function GetItemInfo(Model)
-    if Model and Model:IsA("Model") and Model.Parent and Model.Parent.Name == "Items" then
-        local PrimaryPart = Model.PrimaryPart
-        if not PrimaryPart then return nil end
-        
-        local Position = PrimaryPart.Position
-        local ProximityPrompt
-        
-        for _, ItemInstance in pairs(Model:GetChildren()) do
-            if ItemInstance:IsA("ProximityPrompt") and ItemInstance.MaxActivationDistance == 8 then
-                ProximityPrompt = ItemInstance
-                break -- Fixed: Added break for efficiency
+    -- Game services
+    local Workspace = game:GetService("Workspace")
+    local Players = game:GetService("Players")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local RunService = game:GetService("RunService")
+    local MarketplaceService = game:GetService("MarketplaceService")
+    local TeleportService = game:GetService("TeleportService")
+
+    local Player = Players.LocalPlayer
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+
+    -- Error handling to prevent kicks
+    game:GetService("CoreGui").DescendantAdded:Connect(function(child)
+        if child.Name == "ErrorPrompt" then
+            local GrabError = child:FindFirstChild("ErrorMessage", true)
+            repeat task.wait() until GrabError.Text ~= "Label"
+            local Reason = GrabError.Text
+            if Reason:match("kick") or Reason:match("You") or Reason:match("conn") or Reason:match("rejoin") then
+                TeleportService:Teleport(2809202155, Player)
             end
         end
-        
-        if ProximityPrompt then
-            return {
-                ["Name"] = ProximityPrompt.ObjectText,
-                ["ProximityPrompt"] = ProximityPrompt,
-                ["Position"] = Position,
-                ["IsPriority"] = IsPriorityItem(ProximityPrompt.ObjectText)
-            }
+    end)
+
+    -- Check for 2x gamepass
+    local Has2x = MarketplaceService:UserOwnsGamePassAsync(Player.UserId, 14597778)
+
+    -- Setup item max amounts
+    local MaxItemAmounts = {
+        ["Gold Coin"] = 45,
+        ["Rokakaka"] = 25,
+        ["Pure Rokakaka"] = 10,
+        ["Mysterious Arrow"] = 25,
+        ["Diamond"] = 30,
+        ["Ancient Scroll"] = 10,
+        ["Caesar's Headband"] = 10,
+        ["Stone Mask"] = 10,
+        ["Rib Cage of The Saint's Corpse"] = 20,
+        ["Quinton's Glove"] = 10,
+        ["Zeppeli's Hat"] = 10,
+        ["Lucky Arrow"] = 15,
+        ["Lucky Stone Mask"] = 10,
+        ["Clackers"] = 10,
+        ["Steel Ball"] = 10,
+        ["Dio's Diary"] = 10,
+        ["Green Candy"] = 45,
+        ["Red Candy"] = 45,
+        ["Blue Candy"] = 45,
+        ["Yellow Candy"] = 45
+    }
+
+    if Has2x then
+        for Index, Max in pairs(MaxItemAmounts) do
+            MaxItemAmounts[Index] = Max * 2
         end
     end
-    return nil
-end
 
--- Initialize global item table
-getgenv().SpawnedItems = getgenv().SpawnedItems or {}
-local ItemSpawnFolder = Workspace:WaitForChild("Item_Spawns"):WaitForChild("Items")
-
--- Fixed: Added debounce and better error handling
-local itemAddedDebounce = {}
-ItemSpawnFolder.ChildAdded:Connect(function(Model)
-    if Model:IsA("Model") and not itemAddedDebounce[Model] then
-        itemAddedDebounce[Model] = true
-        
-        task.wait(1) -- Wait for item to be fully set up
-        
-        local ItemInfo = GetItemInfo(Model)
-        if ItemInfo then
-            table.insert(getgenv().SpawnedItems, ItemInfo)
+    -- Hook magnitude for item collection
+    local oldMagnitude
+    oldMagnitude = hookmetamethod(Vector3.new(), "__index", newcclosure(function(self, index)
+        local CallingScript = tostring(getcallingscript())
+        if not checkcaller() and index == "magnitude" and CallingScript == "ItemSpawn" then
+            return 0
         end
-        
-        task.delay(5, function()
-            itemAddedDebounce[Model] = nil
+        return oldMagnitude(self, index)
+    end))
+
+    -- Hook namecall for anti-cheat bypass
+    local UzuKeeIsRetardedAndDoesntKnowHowToMakeAnAntiCheatOnTheServerSideAlsoVexStfuIKnowTheCodeIsBadYouDontNeedToTellMe = "  ___XP DE KEY"
+    local oldNc
+    oldNc = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local Method = getnamecallmethod()
+        local Args = {...}
+        if not checkcaller() and rawequal(self.Name, "Returner") and rawequal(Args[1], "idklolbrah2de") then
+            return UzuKeeIsRetardedAndDoesntKnowHowToMakeAnAntiCheatOnTheServerSideAlsoVexStfuIKnowTheCodeIsBadYouDontNeedToTellMe
+        end
+        return oldNc(self, ...)
+    end))
+
+    -- Wait for HUD and load screens
+    if not PlayerGui:FindFirstChild("HUD") then
+        local HUD = ReplicatedStorage.Objects.HUD:Clone()
+        HUD.Parent = PlayerGui
+    end
+
+    task.spawn(function()
+        pcall(function()
+            PlayerGui:WaitForChild("LoadingScreen1"):Destroy()
         end)
+        task.wait(.5)
+        pcall(function()
+            PlayerGui:WaitForChild("LoadingScreen"):Destroy()
+        end)
+        pcall(function()
+            workspace.LoadingScreen.Song:Destroy()
+        end)
+    end)
+
+    -- Wait for character
+    repeat task.wait() until Player.Character and Player.Character:FindFirstChild("RemoteEvent") and Player.Character:FindFirstChild("HumanoidRootPart")
+    
+    local Character = Player.Character
+    local HumanoidRootPart = Character.HumanoidRootPart
+    local RemoteEvent = Character.RemoteEvent
+
+    -- Press play and teleport
+    RemoteEvent:FireServer("PressedPlay")
+    wait(1)
+    HumanoidRootPart.CFrame = CFrame.new(978, -42, -49)
+    wait(5)
+
+    -- Helper functions
+    local function GetCharacter(Part)
+        if Player.Character then
+            if not Part then
+                return Player.Character
+            elseif typeof(Part) == "string" then
+                return Player.Character:FindFirstChild(Part) or nil
+            end
+        end
+        return nil
     end
-end)
 
--- Main Farming State
-local farmingActive = false
-local farmingThread = nil
+    local function TeleportTo(Position)
+        local HumanoidRootPart = GetCharacter("HumanoidRootPart")
+        if HumanoidRootPart then
+            local PositionType = typeof(Position)
+            if PositionType == "CFrame" then
+                HumanoidRootPart.CFrame = Position
+            end
+        end
+    end
 
-local function SortItems()
-    table.sort(getgenv().SpawnedItems, function(a, b)
-        if a.IsPriority and not b.IsPriority then
-            return true
-        elseif not a.IsPriority and b.IsPriority then
-            return false
+    local function ToggleNoclip(Value)
+        local Character = GetCharacter()
+        if Character then
+            for _, Child in pairs(Character:GetDescendants()) do
+                if Child:IsA("BasePart") and Child.CanCollide == not Value then
+                    Child.CanCollide = Value
+                end
+            end
+        end
+    end
+
+    local function HasMaxItem(Item)
+        local Count = 0
+        for _, Tool in pairs(Player.Backpack:GetChildren()) do
+            if Tool.Name == Item then
+                Count += 1
+            end
+        end
+        if MaxItemAmounts[Item] then
+            return Count >= MaxItemAmounts[Item]
         else
             return false
         end
-    end)
-end
+    end
 
--- Fixed: Improved farm loop with better error handling
-local function farmLoop()
-    while farmingActive do
-        local success, err = pcall(function()
-            if #getgenv().SpawnedItems > 0 then
-                SortItems()
+    local function HasLuckyArrows()
+        local Count = 0
+        for _, Tool in pairs(Player.Backpack:GetChildren()) do
+            if Tool.Name == "Lucky Arrow" then
+                Count += 1
+            end
+        end
+        return Count >= 9
+    end
+
+    local function IsPriorityItem(ItemName)
+        for _, PriorityName in pairs(getgenv().PriorityItems) do
+            if ItemName == PriorityName then
+                return true
+            end
+        end
+        return false
+    end
+
+    local function GetItemInfo(Model)
+        if Model and Model:IsA("Model") and Model.Parent and Model.Parent.Name == "Items" then
+            local PrimaryPart = Model.PrimaryPart
+            if not PrimaryPart then return nil end
+            local Position = PrimaryPart.Position
+            local ProximityPrompt
+            for _, ItemInstance in pairs(Model:GetChildren()) do
+                if ItemInstance:IsA("ProximityPrompt") and ItemInstance.MaxActivationDistance == 8 then
+                    ProximityPrompt = ItemInstance
+                end
+            end
+            if ProximityPrompt then
+                return {
+                    ["Name"] = ProximityPrompt.ObjectText,
+                    ["ProximityPrompt"] = ProximityPrompt,
+                    ["Position"] = Position,
+                    ["IsPriority"] = IsPriorityItem(ProximityPrompt.ObjectText)
+                }
+            end
+        end
+        return nil
+    end
+
+    -- Item spawn tracking
+    local ItemSpawnFolder = Workspace:WaitForChild("Item_Spawns"):WaitForChild("Items")
+    
+    local itemConnection = ItemSpawnFolder.ChildAdded:Connect(function(Model)
+        task.wait(1)
+        if Model:IsA("Model") then
+            local ItemInfo = GetItemInfo(Model)
+            if ItemInfo then
+                table.insert(getgenv().SpawnedItems, ItemInfo)
+            end
+        end
+    end)
+
+    -- Load teleport function
+    local Teleport = loadstring(game:HttpGet("https://raw.githubusercontent.com/rinqedd/pub_rblx/main/ServerHop", true))
+
+    -- Main collection loop
+    while getgenv().ScriptRunning do
+        if #getgenv().SpawnedItems > 0 then
+            -- Sort items by priority
+            table.sort(getgenv().SpawnedItems, function(a, b)
+                if a.IsPriority and not b.IsPriority then
+                    return true
+                elseif not a.IsPriority and b.IsPriority then
+                    return false
+                else
+                    return false
+                end
+            end)
+
+            -- Collect items
+            for Index = #getgenv().SpawnedItems, 1, -1 do
+                if not getgenv().ScriptRunning then break end
                 
-                -- Process items from end to start to avoid indexing issues
-                for Index = #getgenv().SpawnedItems, 1, -1 do
-                    local ItemInfo = getgenv().SpawnedItems[Index]
-                    local HumanoidRootPart = GetCharacter("HumanoidRootPart")
+                local ItemInfo = getgenv().SpawnedItems[Index]
+                local HumanoidRootPart = GetCharacter("HumanoidRootPart")
+                
+                if HumanoidRootPart and ItemInfo then
+                    local Name = ItemInfo.Name
+                    local HasMax = HasMaxItem(Name)
                     
-                    if HumanoidRootPart and ItemInfo then
-                        local Name = ItemInfo.Name
-                        local HasMax = HasMaxItem(Name)
+                    if not HasMax then
+                        local ProximityPrompt = ItemInfo.ProximityPrompt
+                        local Position = ItemInfo.Position
                         
-                        if not HasMax then
-                            local ProximityPrompt = ItemInfo.ProximityPrompt
-                            local Position = ItemInfo.Position
+                        if ProximityPrompt and ProximityPrompt.Parent then
+                            table.remove(getgenv().SpawnedItems, Index)
                             
-                            if ProximityPrompt and ProximityPrompt.Parent then
-                                -- Remove item from list immediately
-                                table.remove(getgenv().SpawnedItems, Index)
-                                
-                                -- Enable noclip and teleport
-                                ToggleNoclip(true)
-                                TeleportTo(CFrame.new(Position.X, Position.Y + 25, Position.Z))
-                                task.wait(.5)
-                                
-                                -- Try to collect item
-                                pcall(function()
-                                    fireproximityprompt(ProximityPrompt)
-                                end)
-                                
-                                task.wait(.5)
-                                TeleportTo(CFrame.new(978, -42, -49))
-                                ToggleNoclip(false)
-                            else
-                                table.remove(getgenv().SpawnedItems, Index)
-                            end
+                            local BodyVelocity = Instance.new("BodyVelocity")
+                            BodyVelocity.Parent = HumanoidRootPart
+                            BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+                            BodyVelocity.MaxForce = Vector3.new(100000, 100000, 100000)
+                            
+                            ToggleNoclip(true)
+                            TeleportTo(CFrame.new(Position.X, Position.Y + 25, Position.Z))
+                            task.wait(.5)
+                            
+                            pcall(function()
+                                fireproximityprompt(ProximityPrompt)
+                            end)
+                            
+                            task.wait(.5)
+                            BodyVelocity:Destroy()
+                            ToggleNoclip(false)
+                            TeleportTo(CFrame.new(978, -42, -49))
                         else
-                            -- Remove if at max capacity
                             table.remove(getgenv().SpawnedItems, Index)
                         end
-                    end
-                end
-            else
-                -- No items to collect
-                if AutoSell then
-                    local Character = GetCharacter()
-                    local Humanoid = Character and Character:FindFirstChild("Humanoid")
-                    local RemoteEvent = Character and Character:FindFirstChild("RemoteEvent")
-                    
-                    if Humanoid and RemoteEvent then
-                        for Item, Sell in pairs(SellItems) do
-                            if Sell then
-                                local Tool = Player.Backpack:FindFirstChild(Item)
-                                if Tool then
-                                    Humanoid:EquipTool(Tool)
-                                    task.wait(.1)
-                                    RemoteEvent:FireServer("EndDialogue", {
-                                        ["NPC"] = "Merchant",
-                                        ["Dialogue"] = "Dialogue5",
-                                        ["Option"] = "Option2"
-                                    })
-                                    task.wait(.2)
-                                end
-                            end
-                        end
-                    end
-                end
-                
-                local Money = Player.PlayerStats.Money
-                
-                if BuyLucky and not HasLuckyArrows() then
-                    local Character = GetCharacter()
-                    local RemoteEvent = Character and Character:FindFirstChild("RemoteEvent")
-                    
-                    if RemoteEvent and Money.Value >= 75000 then
-                        while Money.Value >= 75000 and not HasLuckyArrows() and farmingActive do
-                            RemoteEvent:FireServer("PurchaseShopItem", {["ItemName"] = "1x Lucky Arrow"})
-                            task.wait(.1)
-                        end
-                    end
-                end
-                
-                -- Server hopping logic
-                if Hop then
-                    local ShouldHop = true
-                    
-                    if BuyLucky and not HasLuckyArrows() and Money.Value >= 50000 then
-                        ShouldHop = false
-                    end
-                    
-                    if ShouldHop then
-                        -- Fixed: Removed trailing space from URL
-                        pcall(function()
-                            loadstring(game:HttpGet("https://raw.githubusercontent.com/rinqedd/pub_rblx/main/ServerHop", true))()
-                        end)
-                        task.wait(3)
                     else
-                        task.wait(5)
+                        table.remove(getgenv().SpawnedItems, Index)
                     end
-                else
-                    task.wait(5)
                 end
             end
-        end)
-        
-        if not success then
-            warn("Farm loop error: " .. tostring(err))
-            task.wait(1) -- Wait before retrying
         end
-        
-        -- Small yield to prevent lag
-        if #getgenv().SpawnedItems == 0 then
-            task.wait(1)
-        else
-            task.wait(0.1)
-        end
-    end
-end
 
-local function startFarming()
-    if farmingThread then return end
-    
-    -- Setup HUD if needed
-    if not PlayerGui:FindFirstChild("HUD") then
-        local ReplicatedHUD = ReplicatedStorage:FindFirstChild("Objects") and ReplicatedStorage.Objects:FindFirstChild("HUD")
-        if ReplicatedHUD then
-            local HUD = ReplicatedHUD:Clone()
-            HUD.Parent = PlayerGui
-        end
-    end
-    
-    -- Remove loading screens
-    task.spawn(function()
-        pcall(function() PlayerGui:WaitForChild("LoadingScreen1"):Destroy() end)
-        task.wait(.5)
-        pcall(function() PlayerGui:WaitForChild("LoadingScreen"):Destroy() end)
-        pcall(function() 
-            local loadingScreen = workspace:FindFirstChild("LoadingScreen")
-            if loadingScreen and loadingScreen:FindFirstChild("Song") then
-                loadingScreen.Song:Destroy()
+        -- Auto sell items
+        if #getgenv().SpawnedItems == 0 and getgenv().AutoSell and getgenv().ScriptRunning then
+            for Item, Sell in pairs(getgenv().SellItems) do
+                if Sell and Player.Backpack and Player.Backpack:FindFirstChild(Item) then
+                    local Character = GetCharacter()
+                    if Character and Character:FindFirstChild("Humanoid") and Character:FindFirstChild("RemoteEvent") then
+                        Character.Humanoid:EquipTool(Player.Backpack:FindFirstChild(Item))
+                        task.wait(.1)
+                        Character.RemoteEvent:FireServer("EndDialogue", {
+                            ["NPC"] = "Merchant",
+                            ["Dialogue"] = "Dialogue5",
+                            ["Option"] = "Option2"
+                        })
+                        task.wait(.2)
+                    end
+                end
             end
-        end)
-    end)
-    
-    -- Wait for character and start
-    repeat task.wait() until GetCharacter() and GetCharacter("RemoteEvent")
-    
-    local RemoteEvent = GetCharacter("RemoteEvent")
-    if RemoteEvent then
-        RemoteEvent:FireServer("PressedPlay")
-    end
-    
-    TeleportTo(CFrame.new(978, -42, -49))
-    task.wait(5)
-    
-    farmingActive = true
-    farmingThread = task.spawn(farmLoop)
-    
-    pcall(function()
-        WindUI:Notify({
-            Title = "Zakori",
-            Content = "Auto farming started!",
-            Icon = "check"
-        })
-    end)
-end
+        end
 
-local function stopFarming()
-    farmingActive = false
-    
-    if farmingThread then
-        pcall(function()
-            task.cancel(farmingThread)
-        end)
-        farmingThread = nil
-    end
-    
-    pcall(function()
-        WindUI:Notify({
-            Title = "Zakori",
-            Content = "Auto farming stopped!",
-            Icon = "x"
-        })
-    end)
-end
+        -- Buy lucky arrows
+        local Money = Player.PlayerStats.Money
+        if getgenv().BuyLucky and not HasLuckyArrows() and Money.Value >= 75000 and getgenv().ScriptRunning then
+            while Money.Value >= 75000 and getgenv().ScriptRunning do
+                local Character = GetCharacter()
+                if Character and Character:FindFirstChild("RemoteEvent") then
+                    Character.RemoteEvent:FireServer("PurchaseShopItem", {["ItemName"] = "1x Lucky Arrow"})
+                    task.wait(.1)
+                else
+                    break
+                end
+            end
+        end
 
--- Create UI
-local success, Window = pcall(function()
-    return WindUI:CreateWindow({
-        Title = "Zakori YBA",
-        Icon = "skull",
-        Author = "by Zakori",
-        Folder = "zakori_yba",
-        NewElements = true,
-        HideSearchBar = false,
-        OpenButton = {
-            Title = "Open Zakori UI",
-            CornerRadius = UDim.new(1,0),
-            StrokeThickness = 3,
-            Enabled = true,
-            Draggable = true,
-            OnlyMobile = false,
-            Color = ColorSequence.new(
-                Color3.fromHex("#30FF6A"),
-                Color3.fromHex("#e7ff2f")
-            )
-        }
-    })
-end)
-
-if success and Window then
-    pcall(function()
-        Window:SetToggleKey(Enum.KeyCode.K)
-    end)
-    
-    local ZakoriTab = Window:Tab({
-        Title = "Zakori",
-        Icon = "skull"
-    })
-    
-    -- Auto Farm Toggle
-    ZakoriTab:Toggle({
-        Flag = "AutoFarm",
-        Title = "Auto Farm",
-        Default = false,
-        Callback = function(value)
-            if value then
-                startFarming()
+        -- Server hop
+        if getgenv().Hop and #getgenv().SpawnedItems == 0 and getgenv().ScriptRunning then
+            local ShouldHop = true
+            if getgenv().BuyLucky and not HasLuckyArrows() and Money.Value >= 50000 then
+                ShouldHop = false
+            end
+            
+            if ShouldHop then
+                pcall(function()
+                    Teleport()
+                end)
+                task.wait(3)
             else
-                stopFarming()
+                task.wait(5)
             end
+        else
+            task.wait(#getgenv().SpawnedItems > 0 and 1 or 5)
         end
-    })
-    
-    -- Auto Buy Lucky Arrow Toggle
-    ZakoriTab:Toggle({
-        Flag = "AutoBuyLucky",
-        Title = "Auto Buy Lucky Arrow",
-        Default = false,
-        Callback = function(value)
-            BuyLucky = value
-            pcall(function()
-                WindUI:Notify({
-                    Title = "Zakori",
-                    Content = "Auto buy lucky arrow " .. (value and "enabled" or "disabled"),
-                    Icon = value and "check" or "x"
-                })
-            end)
-        end
-    })
-    
-    -- Auto Sell Toggle
-    ZakoriTab:Toggle({
-        Flag = "AutoSell",
-        Title = "Auto Sell",
-        Default = false,
-        Callback = function(value)
-            AutoSell = value
-            pcall(function()
-                WindUI:Notify({
-                    Title = "Zakori",
-                    Content = "Auto sell " .. (value and "enabled" or "disabled"),
-                    Icon = value and "check" or "x"
-                })
-            end)
-        end
-    })
+    end
+
+    -- Cleanup when script stops
+    if itemConnection then
+        itemConnection:Disconnect()
+    end
 end
 
--- Initial notification
-pcall(function()
-    WindUI:Notify({
-        Title = "Zakori",
-        Content = "Script loaded successfully!",
-        Icon = "check"
-    })
-end)
+-- Show welcome notification
+Rayfield:Notify({
+    Title = "Script Loaded",
+    Content = "Configure settings and enable the script to start",
+    Duration = 5
+})
+
+--идите в пизду мне лень чёт делать так что вот апдейт хуйни на юбу и кст мать парагона жирная шлюха - heny
