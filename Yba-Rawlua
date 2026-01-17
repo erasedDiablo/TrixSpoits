@@ -346,7 +346,7 @@ uiList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 uiList.VerticalAlignment = Enum.VerticalAlignment.Center
 uiList.Padding = UDim.new(0, 12)
 
-local discordLink = "https://discord.gg/QFud9W72"
+local discordLink = "https://discord.gg/2FwHeSyF"
 
 local function makeButton(text, width, onClick)
     local btn = Instance.new("TextButton")
