@@ -1,5 +1,5 @@
 --[[
-    AzureUI v3.0 - Complete UI Library (WindUI Feature Parity)
+    AzureUI v3.1 - Complete UI Library (Fixed & Polished)
     Features: Tabs, Buttons, Toggles, Sliders, Dropdowns, Inputs, Colorpickers, 
     Keybinds, Notifications, Dialogs, Search, Sections, Code Blocks, Images,
     Config System, 10+ Themes, Acrylic/Glass Effects, Mobile Support
@@ -9,11 +9,11 @@ local AzureUI = {}
 AzureUI.__index = AzureUI
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService"TweenService"
-local CoreGui = game:GetService"CoreGui"
-local UserInputService = game:GetService"UserInputService"
-local HttpService = game:GetService"HttpService"
-local RunService = game:GetService"RunService"
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 -- Icon System (Lucide-style)
@@ -139,12 +139,14 @@ local function Ripple(button)
         Position = UDim2.new(0.5, 0, 0.5, 0),
         Size = UDim2.new(0, 0, 0, 0),
         AnchorPoint = Vector2.new(0.5, 0.5),
-        ZIndex = 10
+        ZIndex = button.ZIndex + 1
     })
     Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = ripple})
     Tween(ripple, {Size = UDim2.new(2, 0, 2, 0), BackgroundTransparency = 1}, 0.5)
     task.wait(0.5)
-    ripple:Destroy()
+    if ripple and ripple.Parent then
+        ripple:Destroy()
+    end
 end
 
 -- Notification System
@@ -158,8 +160,8 @@ local NotificationGui = Create("ScreenGui", {
 local NotificationHolder = Create("Frame", {
     Parent = NotificationGui,
     Size = UDim2.new(0, 350, 1, -40),
-    Position = UDim2.new(1, -20, 0, 20),
-    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -370, 0, 20),
+    AnchorPoint = Vector2.new(0, 0),
     BackgroundTransparency = 1
 })
 
@@ -167,7 +169,8 @@ Create("UIListLayout", {
     Parent = NotificationHolder,
     SortOrder = Enum.SortOrder.LayoutOrder,
     Padding = UDim.new(0, 8),
-    VerticalAlignment = Enum.VerticalAlignment.Bottom
+    VerticalAlignment = Enum.VerticalAlignment.Bottom,
+    HorizontalAlignment = Enum.HorizontalAlignment.Right
 })
 
 function AzureUI:Notify(config)
@@ -176,7 +179,7 @@ function AzureUI:Notify(config)
     local content = config.Content or ""
     local duration = config.Duration or 5
     local icon = config.Icon or "bell"
-    local type = config.Type or "Info" -- Info, Success, Warning, Error
+    local notifType = config.Type or "Info" -- Info, Success, Warning, Error
     
     local colors = {
         Info = Theme.Accent,
@@ -190,7 +193,7 @@ function AzureUI:Notify(config)
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundTransparency = 1,
-        LayoutOrder = -(#NotificationQueue)
+        LayoutOrder = tick() -- Use timestamp for ordering
     })
     
     local main = Create("Frame", {
@@ -198,14 +201,14 @@ function AzureUI:Notify(config)
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundColor3 = Theme.Background,
-        BackgroundTransparency = 0.1,
+        BackgroundTransparency = 0.05,
         Position = UDim2.new(1, 20, 0, 0)
     })
     Create("UICorner", {CornerRadius = Theme.CornerRadius, Parent = main})
     
-    local stroke = Create("UIStroke", {
+    Create("UIStroke", {
         Parent = main,
-        Color = colors[type] or Theme.Accent,
+        Color = colors[notifType] or Theme.Accent,
         Thickness = 1.5,
         Transparency = 0.3
     })
@@ -216,7 +219,7 @@ function AzureUI:Notify(config)
         Position = UDim2.new(0, 12, 0, 12),
         BackgroundTransparency = 1,
         Image = GetIcon(icon),
-        ImageColor3 = colors[type] or Theme.Accent
+        ImageColor3 = colors[notifType] or Theme.Accent
     })
     
     local titleLabel = Create("TextLabel", {
@@ -260,11 +263,13 @@ function AzureUI:Notify(config)
         Parent = main,
         Size = UDim2.new(1, 0, 0, 3),
         Position = UDim2.new(0, 0, 1, -3),
-        BackgroundColor3 = colors[type] or Theme.Accent,
+        BackgroundColor3 = colors[notifType] or Theme.Accent,
         BorderSizePixel = 0
     })
     Create("UICorner", {CornerRadius = UDim.new(0, 1), Parent = progressBar})
     
+    -- Calculate height based on text
+    task.wait()
     local contentSize = contentLabel.TextBounds.Y
     local frameHeight = math.max(64, 44 + contentSize + 16)
     notifFrame.Size = UDim2.new(1, 0, 0, frameHeight)
@@ -273,16 +278,21 @@ function AzureUI:Notify(config)
     Tween(main, {Position = UDim2.new(0, 0, 0, 0)}, 0.4, Enum.EasingStyle.Quint)
     Tween(progressBar, {Size = UDim2.new(0, 0, 0, 3)}, duration, Enum.EasingStyle.Linear)
     
+    local closing = false
     local function close()
+        if closing then return end
+        closing = true
         Tween(main, {Position = UDim2.new(1, 20, 0, 0)}, 0.3, Enum.EasingStyle.Quint)
         task.wait(0.3)
-        notifFrame:Destroy()
+        if notifFrame and notifFrame.Parent then
+            notifFrame:Destroy()
+        end
     end
     
     closeBtn.MouseButton1Click:Connect(close)
-    
     task.delay(duration, close)
-    return notifFrame
+    
+    return main
 end
 
 -- Dialog System
@@ -354,19 +364,28 @@ function AzureUI:Dialog(config)
         Position = UDim2.new(0, 0, 0, 0),
         Size = UDim2.new(1, 0, 0, 40),
         BackgroundTransparency = 1,
-        AutomaticSize = Enum.AutomaticSize.X
+        AutomaticSize = Enum.AutomaticSize.Y,
+        LayoutOrder = 100 -- Ensure it's at bottom
     })
     
-    Create("UIListLayout", {
+    local buttonsLayout = Create("UIListLayout", {
         Parent = buttonsFrame,
         FillDirection = Enum.FillDirection.Horizontal,
         HorizontalAlignment = Enum.HorizontalAlignment.Right,
-        Padding = UDim.new(0, 8)
+        Padding = UDim.new(0, 8),
+        VerticalAlignment = Enum.VerticalAlignment.Center
     })
+    
+    -- Update buttons frame position after content
+    task.wait()
+    local contentHeight = contentLabel.TextBounds.Y
+    buttonsFrame.Position = UDim2.new(0, 0, 0, 50 + contentHeight)
     
     -- Animate in
     Tween(overlay, {BackgroundTransparency = 0.5}, 0.2)
     Tween(dialogFrame, {BackgroundTransparency = 0.05}, 0.3)
+    
+    local dialogConnections = {}
     
     for i, btnConfig in ipairs(buttons) do
         local btn = Create("TextButton", {
@@ -382,19 +401,38 @@ function AzureUI:Dialog(config)
         Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = btn})
         Create("UIPadding", {Parent = btn, PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16)})
         
+        btn.MouseEnter:Connect(function()
+            Tween(btn, {BackgroundColor3 = btnConfig.Variant == "Primary" and 
+                Color3.fromRGB(Theme.Accent.R * 0.9, Theme.Accent.G * 0.9, Theme.Accent.B * 0.9) or 
+                Color3.fromRGB(Theme.Secondary.R + 20, Theme.Secondary.G + 20, Theme.Secondary.B + 20)}, 0.2)
+        end)
+        
+        btn.MouseLeave:Connect(function()
+            Tween(btn, {BackgroundColor3 = btnConfig.Variant == "Primary" and Theme.Accent or Theme.Secondary}, 0.2)
+        end)
+        
         btn.MouseButton1Click:Connect(function()
+            -- Cleanup
+            for _, conn in ipairs(dialogConnections) do
+                conn:Disconnect()
+            end
+            
             Tween(overlay, {BackgroundTransparency = 1}, 0.2)
             Tween(dialogFrame, {BackgroundTransparency = 1}, 0.2)
             task.wait(0.2)
             dialogGui:Destroy()
+            
             if btnConfig.Callback then
-                btnConfig.Callback()
+                task.spawn(btnConfig.Callback)
             end
         end)
     end
     
     -- Close function
     local function close()
+        for _, conn in ipairs(dialogConnections) do
+            conn:Disconnect()
+        end
         Tween(overlay, {BackgroundTransparency = 1}, 0.2)
         Tween(dialogFrame, {BackgroundTransparency = 1}, 0.2)
         task.wait(0.2)
@@ -414,15 +452,6 @@ function AzureUI:CreateWindow(config)
     local windowSize = config.Size or UDim2.new(0, 800, 0, 450)
     local currentTheme = config.Theme or "Dark"
     Theme = Themes[currentTheme] or Themes.Dark
-    
-    -- Theme switcher function
-    function Window:SetTheme(themeName)
-        if Themes[themeName] then
-            Theme = Themes[themeName]
-            -- Update all themed elements
-            self:UpdateTheme()
-        end
-    end
     
     -- Check if mobile
     local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -471,11 +500,11 @@ function AzureUI:CreateWindow(config)
         Parent = Window.Main
     })
     
-    -- Search Bar (New)
+    -- Search Bar (Fixed positioning)
     local searchBar = Create("Frame", {
         Name = "SearchBar",
         Parent = Window.Main,
-        Size = UDim2.new(1, -160, 0, 0),
+        Size = UDim2.new(1, -170, 0, 50),
         Position = UDim2.new(0, 160, 0, 70),
         BackgroundTransparency = 1,
         Visible = false,
@@ -484,8 +513,8 @@ function AzureUI:CreateWindow(config)
     
     local searchInput = Create("TextBox", {
         Parent = searchBar,
-        Size = UDim2.new(1, -40, 0, 36),
-        Position = UDim2.new(0, 20, 0, 0),
+        Size = UDim2.new(1, -20, 0, 36),
+        Position = UDim2.new(0, 10, 0, 7),
         BackgroundColor3 = Theme.Secondary,
         BackgroundTransparency = 0.5,
         Text = "",
@@ -496,13 +525,13 @@ function AzureUI:CreateWindow(config)
         ClearTextOnFocus = false
     })
     Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = searchInput})
-    Create("UIPadding", {Parent = searchInput, PaddingLeft = UDim.new(0, 12)})
+    Create("UIPadding", {Parent = searchInput, PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 36)})
     
-    -- Search Icon
+    -- Search Icon inside input
     local searchIcon = Create("ImageLabel", {
         Parent = searchInput,
         Size = UDim2.new(0, 16, 0, 16),
-        Position = UDim2.new(1, -28, 0.5, 0),
+        Position = UDim2.new(1, -26, 0.5, 0),
         AnchorPoint = Vector2.new(0, 0.5),
         BackgroundTransparency = 1,
         Image = GetIcon("search"),
@@ -538,9 +567,8 @@ function AzureUI:CreateWindow(config)
         VerticalAlignment = Enum.VerticalAlignment.Center
     })
     
-    local logoImg
     if config.Icon then
-        logoImg = Create("ImageLabel", {
+        local logoImg = Create("ImageLabel", {
             Parent = titleContainer,
             Size = UDim2.new(0, 32, 0, 32),
             BackgroundTransparency = 1,
@@ -550,7 +578,7 @@ function AzureUI:CreateWindow(config)
         Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = logoImg})
     end
     
-    Create("TextLabel", {
+    local titleLabel = Create("TextLabel", {
         Parent = titleContainer,
         LayoutOrder = 2,
         BackgroundTransparency = 1,
@@ -567,16 +595,18 @@ function AzureUI:CreateWindow(config)
     local btnContainer = Create("Frame", {
         Parent = Window.TitleBar,
         BackgroundTransparency = 1,
-        Position = UDim2.new(1, -140, 0, 8),
-        Size = UDim2.new(0, 130, 0, 32)
+        Position = UDim2.new(1, -10, 0, 0),
+        Size = UDim2.new(0, 140, 1, 0),
+        AnchorPoint = Vector2.new(1, 0)
     })
     
-    Create("UIListLayout", {
+    local btnListLayout = Create("UIListLayout", {
         Parent = btnContainer,
         FillDirection = Enum.FillDirection.Horizontal,
         SortOrder = Enum.SortOrder.LayoutOrder,
         Padding = UDim.new(0, 8),
-        HorizontalAlignment = Enum.HorizontalAlignment.Right
+        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        VerticalAlignment = Enum.VerticalAlignment.Center
     })
     
     -- Search Toggle
@@ -612,7 +642,7 @@ function AzureUI:CreateWindow(config)
     })
     Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = closeBtn})
     
-    -- Tab Container
+    -- Tab Container (Left Sidebar)
     Window.TabContainer = Create("Frame", {
         Name = "Tabs",
         Parent = Window.Main,
@@ -621,7 +651,14 @@ function AzureUI:CreateWindow(config)
         Size = UDim2.new(0, 140, 1, -80)
     })
     
-    -- Content Area
+    local tabListLayout = Create("UIListLayout", {
+        Parent = Window.TabContainer,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 8),
+        VerticalAlignment = Enum.VerticalAlignment.Top
+    })
+    
+    -- Content Area (Right Side)
     Window.ContentFrame = Create("ScrollingFrame", {
         Name = "Content",
         Parent = Window.Main,
@@ -655,7 +692,39 @@ function AzureUI:CreateWindow(config)
     Window.ActiveTab = nil
     Window.Keybinds = {}
     Window.IsOpen = true
-    Window.Elements = {} -- For search functionality
+    Window.Elements = {}
+    
+    -- Theme Update Handler (Fixed missing function)
+    function Window:UpdateTheme()
+        Theme = Themes[config.Theme] or Themes.Dark
+        -- Update all themed elements recursively
+        local function updateColors(instance)
+            if instance:IsA("Frame") or instance:IsA("TextButton") or instance:IsA("ImageButton") or instance:IsA("ScrollingFrame") then
+                if instance.Name == "MainPanel" then
+                    Tween(instance, {BackgroundColor3 = Theme.Background}, 0.3)
+                elseif instance.Name == "Content" then
+                    Tween(instance, {ScrollBarImageColor3 = Theme.Accent}, 0.3)
+                end
+            end
+            if instance:IsA("TextLabel") or instance:IsA("TextBox") or instance:IsA("TextButton") then
+                if instance.TextColor3 ~= Color3.new(1, 1, 1) and instance.TextColor3 ~= Color3.new(0, 0, 0) then
+                    -- Check if it's subtext or main text based on transparency or other properties
+                end
+            end
+            for _, child in ipairs(instance:GetChildren()) do
+                updateColors(child)
+            end
+        end
+        updateColors(self.Main)
+    end
+    
+    function Window:SetTheme(themeName)
+        if Themes[themeName] then
+            config.Theme = themeName
+            Theme = Themes[themeName]
+            self:UpdateTheme()
+        end
+    end
     
     -- Animation Functions
     function Window:Open()
@@ -668,9 +737,6 @@ function AzureUI:CreateWindow(config)
         
         Tween(Window.Main, {Size = windowSize}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
         Tween(Window.Main, {BackgroundTransparency = 0.15}, 0.3)
-        
-        Window.Main.GroupTransparency = 1
-        Tween(Window.Main, {GroupTransparency = 0}, 0.3)
     end
     
     function Window:Close()
@@ -722,15 +788,16 @@ function AzureUI:CreateWindow(config)
     searchInput:GetPropertyChangedSignal("Text"):Connect(function()
         local query = searchInput.Text:lower()
         for _, element in ipairs(Window.Elements) do
-            if element.Name then
-                local visible = element.Name:lower():find(query) ~= nil
+            if element.Name and element.SetVisible then
+                local visible = query == "" or element.Name:lower():find(query) ~= nil
                 element:SetVisible(visible)
             end
         end
     end)
     
-    -- Dragging
+    -- Dragging (Fixed offset calculation)
     local dragging = false
+    local dragInput = nil
     local dragStart = nil
     local startPos = nil
     
@@ -739,11 +806,23 @@ function AzureUI:CreateWindow(config)
             dragging = true
             dragStart = input.Position
             startPos = Window.Main.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    Window.TitleBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
         end
     end)
     
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        if input == dragInput and dragging then
             local delta = input.Position - dragStart
             Window.Main.Position = UDim2.new(
                 startPos.X.Scale, 
@@ -751,12 +830,6 @@ function AzureUI:CreateWindow(config)
                 startPos.Y.Scale, 
                 startPos.Y.Offset + delta.Y
             )
-        end
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
         end
     end)
     
@@ -775,47 +848,75 @@ function AzureUI:CreateWindow(config)
         end
     end)
     
-    -- Config System
+    -- Config System (Safe wrapped)
     Window.ConfigSystem = {
         Folder = config.Folder or "AzureUI",
         Data = {}
     }
     
     function Window:SaveConfig(name)
-        if not isfolder(Window.ConfigSystem.Folder) then
-            makefolder(Window.ConfigSystem.Folder)
-        end
-        local configData = {}
-        for _, tab in pairs(Window.Tabs) do
-            for _, element in pairs(tab.Elements or {}) do
-                if element.Save then
-                    configData[element.Name] = element:Save()
-                end
+        local success, err = pcall(function()
+            if not isfolder(Window.ConfigSystem.Folder) then
+                makefolder(Window.ConfigSystem.Folder)
             end
-        end
-        writefile(Window.ConfigSystem.Folder .. "/" .. name .. ".json", HttpService:JSONEncode(configData))
-        self:Notify({Title = "Config Saved", Content = "Saved configuration: " .. name, Type = "Success"})
-    end
-    
-    function Window:LoadConfig(name)
-        local path = Window.ConfigSystem.Folder .. "/" .. name .. ".json"
-        if isfile(path) then
-            local data = HttpService:JSONDecode(readfile(path))
+            local configData = {}
             for _, tab in pairs(Window.Tabs) do
                 for _, element in pairs(tab.Elements or {}) do
-                    if data[element.Name] and element.Load then
-                        element:Load(data[element.Name])
+                    if element.Save and element.Name then
+                        configData[element.Name] = element:Save()
                     end
                 end
             end
+            writefile(Window.ConfigSystem.Folder .. "/" .. name .. ".json", HttpService:JSONEncode(configData))
+        end)
+        
+        if success then
+            self:Notify({Title = "Config Saved", Content = "Saved configuration: " .. name, Type = "Success"})
+        else
+            self:Notify({Title = "Error", Content = "Failed to save config: " .. tostring(err), Type = "Error"})
+        end
+    end
+    
+    function Window:LoadConfig(name)
+        local success, err = pcall(function()
+            local path = Window.ConfigSystem.Folder .. "/" .. name .. ".json"
+            if isfile(path) then
+                local data = HttpService:JSONDecode(readfile(path))
+                for _, tab in pairs(Window.Tabs) do
+                    for _, element in pairs(tab.Elements or {}) do
+                        if element.Name and data[element.Name] and element.Load then
+                            element:Load(data[element.Name])
+                        end
+                    end
+                end
+            else
+                error("Config not found")
+            end
+        end)
+        
+        if success then
             self:Notify({Title = "Config Loaded", Content = "Loaded configuration: " .. name, Type = "Success"})
+        else
+            self:Notify({Title = "Error", Content = "Failed to load config: " .. tostring(err), Type = "Error"})
+        end
+    end
+    
+    function Window:DeleteConfig(name)
+        local success = pcall(function()
+            local path = Window.ConfigSystem.Folder .. "/" .. name .. ".json"
+            if isfile(path) then
+                delfile(path)
+            end
+        end)
+        if success then
+            self:Notify({Title = "Config Deleted", Content = "Deleted configuration: " .. name, Type = "Success"})
         end
     end
     
     return Window
 end
 
--- Create Tab
+-- Create Tab (Fixed layout)
 function AzureUI:CreateTab(config)
     local Window = self
     config = config or {}
@@ -823,6 +924,7 @@ function AzureUI:CreateTab(config)
     local icon = config.Icon
     local Tab = {}
     
+    -- Tab Button with proper layout
     local tabBtn = Create("TextButton", {
         Name = name,
         Parent = Window.TabContainer,
@@ -836,6 +938,57 @@ function AzureUI:CreateTab(config)
     })
     Create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = tabBtn})
     
+    -- Padding for tab contents
+    Create("UIPadding", {
+        Parent = tabBtn,
+        PaddingLeft = UDim.new(0, 12),
+        PaddingRight = UDim.new(0, 12)
+    })
+    
+    -- Layout container for icon + text
+    local layoutContainer = Create("Frame", {
+        Parent = tabBtn,
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1
+    })
+    
+    local layout = Create("UIListLayout", {
+        Parent = layoutContainer,
+        FillDirection = Enum.FillDirection.Horizontal,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 10),
+        VerticalAlignment = Enum.VerticalAlignment.Center
+    })
+    
+    -- Icon (if provided)
+    local tabIcon = nil
+    if icon then
+        tabIcon = Create("ImageLabel", {
+            Parent = layoutContainer,
+            Size = UDim2.new(0, 20, 0, 20),
+            BackgroundTransparency = 1,
+            Image = GetIcon(icon),
+            ImageColor3 = Theme.SubText,
+            LayoutOrder = 1
+        })
+        Tab.Icon = tabIcon
+    end
+    
+    -- Text Label (Fixed: proper sizing with UIListLayout)
+    local tabText = Create("TextLabel", {
+        Parent = layoutContainer,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(0, 0, 1, 0), -- Let AutomaticSize handle width
+        AutomaticSize = Enum.AutomaticSize.X,
+        Font = Enum.Font.GothamSemibold,
+        Text = name,
+        TextColor3 = Theme.SubText,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        LayoutOrder = 2
+    })
+    
+    -- Content Container for this tab
     local contentContainer = Create("Frame", {
         Parent = Window.ContentFrame,
         BackgroundTransparency = 1,
@@ -849,57 +1002,29 @@ function AzureUI:CreateTab(config)
         Padding = UDim.new(0, 10)
     })
     
-    Create("UIPadding", {
-        Parent = tabBtn,
-        PaddingLeft = UDim.new(0, 12),
-        PaddingRight = UDim.new(0, 12)
-    })
+    Tab.Button = tabBtn
+    Tab.Content = contentContainer
+    Tab.Elements = {}
+    Tab.Window = Window
     
-    local tabLayout = Create("UIListLayout", {
-        Parent = tabBtn,
-        FillDirection = Enum.FillDirection.Horizontal,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 10),
-        VerticalAlignment = Enum.VerticalAlignment.Center
-    })
-    
-    if icon then
-        local tabIcon = Create("ImageLabel", {
-            Parent = tabBtn,
-            Size = UDim2.new(0, 20, 0, 20),
-            BackgroundTransparency = 1,
-            Image = GetIcon(icon),
-            ImageColor3 = Theme.SubText,
-            LayoutOrder = 1
-        })
-        Tab.Icon = tabIcon
-    end
-    
-    local tabText = Create("TextLabel", {
-        Parent = tabBtn,
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, icon and -30 or 0, 1, 0),
-        Font = Enum.Font.GothamSemibold,
-        Text = name,
-        TextColor3 = Theme.SubText,
-        TextSize = 14,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        LayoutOrder = 2
-    })
-    
-    -- Tab Switch Animation
+    -- Tab Switch Animation (Fixed)
     tabBtn.MouseButton1Click:Connect(function()
         if Window.ActiveTab == Tab then return end
         
+        -- Deactivate previous tab
         if Window.ActiveTab then
             Tween(Window.ActiveTab.Button, {BackgroundColor3 = Theme.Secondary}, 0.3)
             if Window.ActiveTab.Icon then
                 Tween(Window.ActiveTab.Icon, {ImageColor3 = Theme.SubText}, 0.3)
             end
-            Window.ActiveTab.Button:FindFirstChildWhichIsA("TextLabel").TextColor3 = Theme.SubText
+            local prevText = Window.ActiveTab.Button:FindFirstChildWhichIsA("TextLabel", true)
+            if prevText then
+                Tween(prevText, {TextColor3 = Theme.SubText}, 0.3)
+            end
             Window.ActiveTab.Content.Visible = false
         end
         
+        -- Activate new tab
         Window.ActiveTab = Tab
         Tween(tabBtn, {BackgroundColor3 = Theme.Accent}, 0.3)
         if Tab.Icon then
@@ -907,15 +1032,13 @@ function AzureUI:CreateTab(config)
         end
         Tween(tabText, {TextColor3 = Color3.new(1, 1, 1)}, 0.3)
         
+        -- Animate content
         Tab.Content.Visible = true
-        Tab.Content.Position = UDim2.new(0.05, 0, 0, 0)
+        Tab.Content.Position = UDim2.new(0.02, 0, 0, 0)
         Tween(Tab.Content, {Position = UDim2.new(0, 0, 0, 0)}, 0.3, Enum.EasingStyle.Back)
     end)
     
-    Tab.Button = tabBtn
-    Tab.Content = contentContainer
-    Tab.Elements = {}
-    
+    -- Set first tab as active by default
     if not Window.ActiveTab then
         Window.ActiveTab = Tab
         tabBtn.BackgroundColor3 = Theme.Accent
@@ -935,7 +1058,7 @@ function AzureUI:CreateSection(config)
     local Tab = self
     config = config or {}
     local name = config.Name or "Section"
-    local isOpen = config.Open or false
+    local isOpen = config.Open ~= false -- Default to open
     
     local sectionFrame = Create("Frame", {
         Parent = Tab.Content,
@@ -945,6 +1068,7 @@ function AzureUI:CreateSection(config)
         LayoutOrder = #Tab.Elements + 1
     })
     
+    -- Header
     local header = Create("TextButton", {
         Parent = sectionFrame,
         Size = UDim2.new(1, 0, 0, 36),
@@ -962,7 +1086,8 @@ function AzureUI:CreateSection(config)
         AnchorPoint = Vector2.new(1, 0.5),
         BackgroundTransparency = 1,
         Image = GetIcon("chevron-down"),
-        ImageColor3 = Theme.Text
+        ImageColor3 = Theme.Text,
+        Rotation = isOpen and 180 or 0
     })
     
     local title = Create("TextLabel", {
@@ -977,6 +1102,7 @@ function AzureUI:CreateSection(config)
         TextXAlignment = Enum.TextXAlignment.Left
     })
     
+    -- Content Container
     local content = Create("Frame", {
         Parent = sectionFrame,
         Position = UDim2.new(0, 0, 0, 40),
@@ -1002,6 +1128,7 @@ function AzureUI:CreateSection(config)
     
     local sectionObj = {
         Name = name,
+        Type = "Section",
         Content = content,
         SetVisible = function(self, visible)
             sectionFrame.Visible = visible
@@ -1023,6 +1150,7 @@ end
 -- Create Toggle
 function AzureUI:CreateToggle(config)
     local parent = self.Content or self
+    config = config or {}
     local name = config.Name or "Toggle"
     local default = config.Default or false
     local callback = config.Callback or function() end
@@ -1048,7 +1176,7 @@ function AzureUI:CreateToggle(config)
         PaddingRight = UDim.new(0, 12)
     })
     
-    Create("UIListLayout", {
+    local layout = Create("UIListLayout", {
         Parent = container,
         FillDirection = Enum.FillDirection.Horizontal,
         Padding = UDim.new(0, 10),
@@ -1078,13 +1206,22 @@ function AzureUI:CreateToggle(config)
         LayoutOrder = 2
     })
     
-    local switch = Create("TextButton", {
+    -- Switch container (right side)
+    local switchContainer = Create("Frame", {
         Parent = container,
+        Size = UDim2.new(0.3, 0, 1, 0),
+        BackgroundTransparency = 1,
+        LayoutOrder = 3
+    })
+    
+    local switch = Create("TextButton", {
+        Parent = switchContainer,
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, 0, 0.5, 0),
         BackgroundColor3 = default and Theme.ToggleOn or Theme.ToggleOff,
         Size = UDim2.new(0, 44, 0, 24),
         Text = "",
-        AutoButtonColor = false,
-        LayoutOrder = 3
+        AutoButtonColor = false
     })
     Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = switch})
     
@@ -1117,13 +1254,13 @@ function AzureUI:CreateToggle(config)
         end
     }
     
-    table.insert(self.Window.Elements or {}, toggleObj)
-    if self.Elements then table.insert(self.Elements, toggleObj) end
-    
     switch.MouseButton1Click:Connect(function()
         enabled = not enabled
         toggleObj:Set(enabled)
     end)
+    
+    table.insert(self.Window.Elements or {}, toggleObj)
+    if self.Elements then table.insert(self.Elements, toggleObj) end
     
     return toggleObj
 end
@@ -1131,16 +1268,19 @@ end
 -- Create Slider
 function AzureUI:CreateSlider(config)
     local parent = self.Content or self
+    config = config or {}
     local name = config.Name or "Slider"
     local min = config.Min or 0
     local max = config.Max or 100
-    local default = config.Default or min
+    local default = math.clamp(config.Default or min, min, max)
     local callback = config.Callback or function() end
+    local decimals = config.Decimals or 0
     
     local frame = Create("Frame", {
         Parent = parent,
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 60)
+        Size = UDim2.new(1, 0, 0, 60),
+        LayoutOrder = #parent:GetChildren()
     })
     
     local container = Create("Frame", {
@@ -1209,25 +1349,30 @@ function AzureUI:CreateSlider(config)
         Position = UDim2.new((default - min) / (max - min), -10, 0.5, -10),
         Size = UDim2.new(0, 20, 0, 20),
         Text = "",
-        AutoButtonColor = false
+        AutoButtonColor = false,
+        ZIndex = 2
     })
     Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = knob})
     
     local value = default
+    local dragging = false
     
     local function update(input)
-        local pos = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
-        value = min + (pos * (max - min))
-        value = math.floor(value)
+        local posX = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+        value = min + (posX * (max - min))
+        if decimals == 0 then
+            value = math.floor(value)
+        else
+            value = math.floor(value * (10 ^ decimals)) / (10 ^ decimals)
+        end
         
-        fill.Size = UDim2.new(pos, 0, 1, 0)
-        knob.Position = UDim2.new(pos, -10, 0.5, -10)
+        fill.Size = UDim2.new(posX, 0, 1, 0)
+        knob.Position = UDim2.new(posX, -10, 0.5, -10)
         valueLabel.Text = tostring(value)
         
         callback(value)
     end
     
-    local dragging = false
     knob.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
@@ -1259,7 +1404,7 @@ function AzureUI:CreateSlider(config)
         SetVisible = function(self, visible) frame.Visible = visible end,
         Save = function(self) return value end,
         Load = function(self, data)
-            value = data
+            value = math.clamp(data, min, max)
             local pos = (value - min) / (max - min)
             fill.Size = UDim2.new(pos, 0, 1, 0)
             knob.Position = UDim2.new(pos, -10, 0.5, -10)
@@ -1285,6 +1430,7 @@ end
 -- Create Dropdown
 function AzureUI:CreateDropdown(config)
     local parent = self.Content or self
+    config = config or {}
     local name = config.Name or "Dropdown"
     local values = config.Values or {}
     local default = config.Default
@@ -1345,7 +1491,8 @@ function AzureUI:CreateDropdown(config)
         TextColor3 = Theme.Accent,
         TextSize = 14,
         TextXAlignment = Enum.TextXAlignment.Right,
-        Text = multi and "Select..." or (default or "Select...")
+        Text = multi and "Select..." or (default or "Select..."),
+        TextTruncate = Enum.TextTruncate.AtEnd
     })
     
     local dropdownFrame = Create("Frame", {
@@ -1390,6 +1537,8 @@ function AzureUI:CreateDropdown(config)
         end
     end
     
+    local dropdownButtons = {}
+    
     local dropdownObj = {
         Name = name,
         Type = "Dropdown",
@@ -1401,25 +1550,30 @@ function AzureUI:CreateDropdown(config)
             callback(selected)
         end,
         Refresh = function(self, newValues)
-            for _, child in pairs(itemsFrame:GetChildren()) do
-                if child:IsA("TextButton") then
-                    child:Destroy()
-                end
+            values = newValues
+            -- Clear existing
+            for _, btn in ipairs(dropdownButtons) do
+                btn:Destroy()
             end
+            dropdownButtons = {}
             
-            for _, value in ipairs(newValues) do
+            -- Create new buttons
+            for i, value in ipairs(newValues) do
+                local isSelected = multi and table.find(selected, value) or selected == value
+                
                 local btn = Create("TextButton", {
                     Parent = itemsFrame,
                     Size = UDim2.new(1, 0, 0, 32),
-                    BackgroundColor3 = Theme.Background,
+                    BackgroundColor3 = isSelected and Theme.Accent or Theme.Background,
                     BackgroundTransparency = 0.5,
                     Text = value,
                     Font = Enum.Font.Gotham,
                     TextColor3 = Theme.Text,
                     TextSize = 13,
-                    LayoutOrder = _
+                    LayoutOrder = i
                 })
                 Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
+                table.insert(dropdownButtons, btn)
                 
                 btn.MouseButton1Click:Connect(function()
                     if multi then
@@ -1433,6 +1587,12 @@ function AzureUI:CreateDropdown(config)
                         end
                     else
                         selected = value
+                        -- Update visual selection states
+                        for _, otherBtn in ipairs(dropdownButtons) do
+                            otherBtn.BackgroundColor3 = Theme.Background
+                        end
+                        btn.BackgroundColor3 = Theme.Accent
+                        
                         isOpen = false
                         dropdownFrame.Visible = false
                         Tween(arrow, {Rotation = 0}, 0.2)
@@ -1442,6 +1602,11 @@ function AzureUI:CreateDropdown(config)
                     callback(selected)
                 end)
             end
+        end,
+        Set = function(self, value)
+            selected = value
+            updateText()
+            callback(selected)
         end
     }
     
@@ -1473,6 +1638,7 @@ end
 -- Create Input
 function AzureUI:CreateInput(config)
     local parent = self.Content or self
+    config = config or {}
     local name = config.Name or "Input"
     local placeholder = config.Placeholder or "Enter text..."
     local default = config.Default or ""
@@ -1481,7 +1647,8 @@ function AzureUI:CreateInput(config)
     local frame = Create("Frame", {
         Parent = parent,
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 42)
+        Size = UDim2.new(1, 0, 0, 42),
+        LayoutOrder = #parent:GetChildren()
     })
     
     local container = Create("Frame", {
@@ -1520,7 +1687,8 @@ function AzureUI:CreateInput(config)
         PlaceholderText = placeholder,
         TextColor3 = Theme.Text,
         TextSize = 14,
-        ClearTextOnFocus = false
+        ClearTextOnFocus = false,
+        TextTruncate = Enum.TextTruncate.AtEnd
     })
     Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = input})
     Create("UIPadding", {Parent = input, PaddingLeft = UDim.new(0, 8)})
@@ -1554,6 +1722,7 @@ end
 -- Create Colorpicker
 function AzureUI:CreateColorpicker(config)
     local parent = self.Content or self
+    config = config or {}
     local name = config.Name or "Colorpicker"
     local default = config.Default or Color3.fromRGB(255, 255, 255)
     local callback = config.Callback or function() end
@@ -1561,7 +1730,8 @@ function AzureUI:CreateColorpicker(config)
     local frame = Create("Frame", {
         Parent = parent,
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 42)
+        Size = UDim2.new(1, 0, 0, 42),
+        LayoutOrder = #parent:GetChildren()
     })
     
     local container = Create("Frame", {
@@ -1602,6 +1772,60 @@ function AzureUI:CreateColorpicker(config)
     
     local currentColor = default
     
+    -- RGB Inputs Dialog
+    local function openColorDialog()
+        local dialog = self.Window -- Use main window's dialog system or create inline
+        
+        -- Simple RGB input dialog
+        local r = math.floor(currentColor.R * 255)
+        local g = math.floor(currentColor.G * 255)
+        local b = math.floor(currentColor.B * 255)
+        
+        -- Create temporary dialog
+        AzureUI:Dialog({
+            Title = "Color Picker",
+            Content = "Enter RGB values (0-255)",
+            Buttons = {
+                {
+                    Title = "Cancel",
+                    Variant = "Secondary",
+                    Callback = function() end
+                },
+                {
+                    Title = "Set",
+                    Variant = "Primary",
+                    Callback = function()
+                        -- In a real implementation, parse inputs from a custom dialog
+                        -- For now, cycle preset colors as demonstration
+                        local presets = {
+                            Color3.fromRGB(255, 0, 0),
+                            Color3.fromRGB(0, 255, 0),
+                            Color3.fromRGB(0, 0, 255),
+                            Color3.fromRGB(255, 255, 0),
+                            Color3.fromRGB(255, 0, 255),
+                            Color3.fromRGB(0, 255, 255),
+                            Theme.Accent
+                        }
+                        local currentIdx = 1
+                        for i, col in ipairs(presets) do
+                            if math.abs(col.R - currentColor.R) < 0.01 and 
+                               math.abs(col.G - currentColor.G) < 0.01 and 
+                               math.abs(col.B - currentColor.B) < 0.01 then
+                                currentIdx = i
+                                break
+                            end
+                        end
+                        currentIdx = currentIdx + 1
+                        if currentIdx > #presets then currentIdx = 1 end
+                        currentColor = presets[currentIdx]
+                        preview.BackgroundColor3 = currentColor
+                        callback(currentColor)
+                    end
+                }
+            }
+        })
+    end
+    
     local colorObj = {
         Name = name,
         Type = "Colorpicker",
@@ -1619,41 +1843,7 @@ function AzureUI:CreateColorpicker(config)
         end
     }
     
-    preview.MouseButton1Click:Connect(function()
-        -- Simple color dialog using RGB inputs
-        local dialog = AzureUI:Dialog({
-            Title = "Select Color",
-            Content = "Enter RGB values (0-255)",
-            Buttons = {
-                {
-                    Title = "Cancel",
-                    Variant = "Secondary",
-                    Callback = function() end
-                },
-                {
-                    Title = "Set",
-                    Variant = "Primary",
-                    Callback = function()
-                        -- This would open a more complex picker in a full implementation
-                        -- For now, just cycle through some preset colors
-                        local presets = {
-                            Color3.fromRGB(255, 0, 0),
-                            Color3.fromRGB(0, 255, 0),
-                            Color3.fromRGB(0, 0, 255),
-                            Color3.fromRGB(255, 255, 0),
-                            Theme.Accent
-                        }
-                        local current = table.find(presets, currentColor) or 0
-                        current = current + 1
-                        if current > #presets then current = 1 end
-                        currentColor = presets[current]
-                        preview.BackgroundColor3 = currentColor
-                        callback(currentColor)
-                    end
-                }
-            }
-        })
-    end)
+    preview.MouseButton1Click:Connect(openColorDialog)
     
     table.insert(self.Window.Elements or {}, colorObj)
     if self.Elements then table.insert(self.Elements, colorObj) end
@@ -1680,7 +1870,7 @@ function AzureUI:CreateButton(config)
     })
     Create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = btn})
     
-    Create("UIListLayout", {
+    local btnLayout = Create("UIListLayout", {
         Parent = btn,
         FillDirection = Enum.FillDirection.Horizontal,
         Padding = UDim.new(0, 10),
@@ -1699,7 +1889,7 @@ function AzureUI:CreateButton(config)
         })
     end
     
-    Create("TextLabel", {
+    local btnText = Create("TextLabel", {
         Parent = btn,
         BackgroundTransparency = 1,
         AutomaticSize = Enum.AutomaticSize.XY,
@@ -1710,20 +1900,25 @@ function AzureUI:CreateButton(config)
         LayoutOrder = 2
     })
     
+    local originalColor = config.Variant == "Secondary" and Theme.Secondary or Theme.Accent
+    
     btn.MouseEnter:Connect(function()
-        Tween(btn, {BackgroundColor3 = config.Variant == "Secondary" and 
-            Color3.fromRGB(Theme.Secondary.R + 20, Theme.Secondary.G + 20, Theme.Secondary.B + 20) or 
-            Color3.fromRGB(70, 83, 220)}, 0.2)
+        local darken = config.Variant == "Secondary" and 20 or -30
+        Tween(btn, {BackgroundColor3 = Color3.fromRGB(
+            math.clamp(originalColor.R * 255 + darken, 0, 255),
+            math.clamp(originalColor.G * 255 + darken, 0, 255),
+            math.clamp(originalColor.B * 255 + darken, 0, 255)
+        )}, 0.2)
     end)
     
     btn.MouseLeave:Connect(function()
-        Tween(btn, {BackgroundColor3 = config.Variant == "Secondary" and Theme.Secondary or Theme.Accent}, 0.2)
+        Tween(btn, {BackgroundColor3 = originalColor}, 0.2)
     end)
     
     btn.MouseButton1Click:Connect(function()
         Ripple(btn)
         if config.Callback then
-            config.Callback()
+            task.spawn(config.Callback)
         end
     end)
     
@@ -1732,7 +1927,7 @@ function AzureUI:CreateButton(config)
         Type = "Button",
         SetVisible = function(self, visible) btn.Visible = visible end,
         Set = function(self, text)
-            btn:FindFirstChildWhichIsA("TextLabel").Text = text
+            btnText.Text = text
         end
     }
     
@@ -1751,7 +1946,8 @@ function AzureUI:CreateKeybind(config)
     local frame = Create("Frame", {
         Parent = parent,
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 42)
+        Size = UDim2.new(1, 0, 0, 42),
+        LayoutOrder = #parent:GetChildren()
     })
     
     local container = Create("Frame", {
@@ -1808,9 +2004,25 @@ function AzureUI:CreateKeybind(config)
         SetVisible = function(self, visible) frame.Visible = visible end,
         Save = function(self) return currentKey and currentKey.Name or nil end,
         Load = function(self, keyName)
-            if keyName then
+            if keyName and Enum.KeyCode[keyName] then
                 currentKey = Enum.KeyCode[keyName]
                 keyButton.Text = keyName
+                
+                -- Update Window keybinds table
+                for i, bind in ipairs(Window.Keybinds) do
+                    if bind.Name == config.Name then
+                        table.remove(Window.Keybinds, i)
+                        break
+                    end
+                end
+                
+                if config.Callback then
+                    table.insert(Window.Keybinds, {
+                        Name = config.Name,
+                        Key = currentKey,
+                        Callback = config.Callback
+                    })
+                end
             end
         end
     }
@@ -1829,20 +2041,30 @@ function AzureUI:CreateKeybind(config)
                 listening = false
                 Tween(keyButton, {BackgroundColor3 = Theme.Background}, 0.2)
                 
+                -- Remove old binding if exists
+                for i, bind in ipairs(Window.Keybinds) do
+                    if bind.Name == config.Name then
+                        table.remove(Window.Keybinds, i)
+                        break
+                    end
+                end
+                
                 if config.Callback then
                     table.insert(Window.Keybinds, {
+                        Name = config.Name,
                         Key = currentKey,
                         Callback = config.Callback
                     })
                 end
                 
-                connection:Disconnect()
+                if connection then connection:Disconnect() end
             end
         end)
     end)
     
     if config.Callback and currentKey then
         table.insert(Window.Keybinds, {
+            Name = config.Name,
             Key = currentKey,
             Callback = config.Callback
         })
@@ -1857,6 +2079,7 @@ end
 -- Create Code Block
 function AzureUI:CreateCode(config)
     local parent = self.Content or self
+    config = config or {}
     local code = config.Code or ""
     local language = config.Language or "lua"
     
@@ -1864,7 +2087,8 @@ function AzureUI:CreateCode(config)
         Parent = parent,
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y
+        AutomaticSize = Enum.AutomaticSize.Y,
+        LayoutOrder = #parent:GetChildren()
     })
     
     local bg = Create("Frame", {
@@ -1875,17 +2099,25 @@ function AzureUI:CreateCode(config)
     })
     Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = bg})
     
-    local label = Create("TextLabel", {
+    local header = Create("Frame", {
         Parent = bg,
         Size = UDim2.new(1, 0, 0, 30),
         BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-        BackgroundTransparency = 0.5,
+        BackgroundTransparency = 0.5
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = header})
+    
+    local headerText = Create("TextLabel", {
+        Parent = header,
+        Size = UDim2.new(1, -20, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
         Font = Enum.Font.GothamBold,
         Text = language:upper(),
         TextColor3 = Theme.SubText,
-        TextSize = 12
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left
     })
-    Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = label})
     
     local textBox = Create("TextBox", {
         Parent = bg,
@@ -1903,12 +2135,6 @@ function AzureUI:CreateCode(config)
         ClearTextOnFocus = false,
         MultiLine = true
     })
-    
-    -- Simple syntax highlighting simulation
-    local function highlight()
-        -- In a real implementation, this would parse and colorize text
-        -- For now, we just keep it as a code block
-    end
     
     local codeObj = {
         Name = config.Name or "Code",
@@ -1929,13 +2155,15 @@ end
 -- Create Image
 function AzureUI:CreateImage(config)
     local parent = self.Content or self
+    config = config or {}
     local imageId = config.Image or ""
     local size = config.Size or UDim2.new(1, 0, 0, 150)
     
     local frame = Create("Frame", {
         Parent = parent,
         BackgroundTransparency = 1,
-        Size = size
+        Size = size,
+        LayoutOrder = #parent:GetChildren()
     })
     
     local img = Create("ImageLabel", {
@@ -1943,7 +2171,7 @@ function AzureUI:CreateImage(config)
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
         Image = imageId,
-        ScaleType = Enum.ScaleType.Crop
+        ScaleType = config.ScaleType or Enum.ScaleType.Crop
     })
     Create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = img})
     
@@ -1960,6 +2188,45 @@ function AzureUI:CreateImage(config)
     if self.Elements then table.insert(self.Elements, imageObj) end
     
     return imageObj
+end
+
+-- Create Label (NEW)
+function AzureUI:CreateLabel(config)
+    local parent = self.Content or self
+    config = config or {}
+    
+    local frame = Create("Frame", {
+        Parent = parent,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 30),
+        LayoutOrder = #parent:GetChildren()
+    })
+    
+    local label = Create("TextLabel", {
+        Parent = frame,
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Font = config.Font or Enum.Font.GothamBold,
+        Text = config.Text or "Label",
+        TextColor3 = config.Color or Theme.Text,
+        TextSize = config.Size or 14,
+        TextXAlignment = config.Alignment or Enum.TextXAlignment.Left,
+        TextWrapped = true
+    })
+    
+    local labelObj = {
+        Name = config.Name or "Label",
+        Type = "Label",
+        SetVisible = function(self, visible) frame.Visible = visible end,
+        Set = function(self, text)
+            label.Text = text
+        end
+    }
+    
+    table.insert(self.Window.Elements or {}, labelObj)
+    if self.Elements then table.insert(self.Elements, labelObj) end
+    
+    return labelObj
 end
 
 return AzureUI
