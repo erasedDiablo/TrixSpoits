@@ -45,6 +45,7 @@ local Icons = {
     ["move"] = "rbxassetid://7733949600",
     ["log-out"] = "rbxassetid://7733779730",
     ["arrow-right"] = "rbxassetid://7733671454",
+    ["arrow-up"] = "rbxassetid://7733671593",
     ["square-mouse-pointer"] = "rbxassetid://7733979893",
     ["toggle-right"] = "rbxassetid://7733980649",
     ["sliders-horizontal"] = "rbxassetid://7733970821",
@@ -55,6 +56,11 @@ local Icons = {
     ["triangle-alert"] = "rbxassetid://7733992109",
     ["expand"] = "rbxassetid://7733942654",
     ["chevrons-up-down"] = "rbxassetid://7733717659",
+    ["eye"] = "rbxassetid://7733942654",
+    ["repeat"] = "rbxassetid://7733970711",
+    ["alert-circle"] = "rbxassetid://7733658504",
+    ["save"] = "rbxassetid://7733955749",
+    ["log-in"] = "rbxassetid://7733779730"
 }
 
 -- Extended Theme System
@@ -268,7 +274,7 @@ function AzureUI:Notify(config)
     })
     Create("UICorner", {CornerRadius = UDim.new(0, 1), Parent = progressBar})
     
-    -- Calculate height based on text
+    -- Calculate height based on content
     task.wait()
     local contentSize = contentLabel.TextBounds.Y
     local frameHeight = math.max(64, 44 + contentSize + 16)
@@ -924,6 +930,9 @@ function AzureUI:CreateTab(config)
     local icon = config.Icon
     local Tab = {}
     
+    -- FIX: Set metatable so Tab inherits CreateButton, CreateToggle, etc.
+    setmetatable(Tab, AzureUI)
+    
     -- Tab Button with proper layout
     local tabBtn = Create("TextButton", {
         Name = name,
@@ -992,7 +1001,8 @@ function AzureUI:CreateTab(config)
     local contentContainer = Create("Frame", {
         Parent = Window.ContentFrame,
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 1, 0),
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
         Visible = false
     })
     
@@ -1134,6 +1144,9 @@ function AzureUI:CreateSection(config)
             sectionFrame.Visible = visible
         end
     }
+    
+    -- FIX: Allow sections to also create elements if needed
+    setmetatable(sectionObj, AzureUI)
     
     table.insert(Tab.Elements, sectionObj)
     table.insert(Tab.Window.Elements, sectionObj)
@@ -1848,6 +1861,7 @@ function AzureUI:CreateColorpicker(config)
     table.insert(self.Window.Elements or {}, colorObj)
     if self.Elements then table.insert(self.Elements, colorObj) end
     
+    -- FIX: Return the color object
     return colorObj
 end
 
