@@ -1,0 +1,675 @@
+--[[
+    AzureUI v1.0 - Universal Roblox UI Library
+    Inspired by Rayfield & WindUI
+    Optimized for Velocity, Synapse X, Krnl, Fluxus, etc.
+]]
+
+local AzureUI = {}
+AzureUI.__index = AzureUI
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+
+-- Theme Configuration
+local Theme = {
+    Background = Color3.fromRGB(15, 15, 15),
+    BackgroundTransparency = 0.1,
+    Accent = Color3.fromRGB(88, 101, 242),
+    Secondary = Color3.fromRGB(35, 35, 35),
+    Text = Color3.fromRGB(255, 255, 255),
+    SubText = Color3.fromRGB(200, 200, 200),
+    ToggleOn = Color3.fromRGB(0, 170, 127),
+    ToggleOff = Color3.fromRGB(50, 50, 50),
+    CornerRadius = UDim.new(0, 8),
+    AnimationSpeed = 0.3
+}
+
+-- Utility Functions
+local function Create(instanceType, properties)
+    local instance = Instance.new(instanceType)
+    for prop, value in pairs(properties or {}) do
+        instance[prop] = value
+    end
+    return instance
+end
+
+local function Tween(instance, properties, duration, easingStyle, easingDirection)
+    TweenService:Create(
+        instance, 
+        TweenInfo.new(duration or Theme.AnimationSpeed, easingStyle or Enum.EasingStyle.Quart, easingDirection or Enum.EasingDirection.Out), 
+        properties
+    ):Play()
+end
+
+-- Notification System
+local NotifGui = Create("ScreenGui", {
+    Name = "AzureNotifications",
+    Parent = CoreGui,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+})
+
+local NotifContainer = Create("Frame", {
+    Name = "Container",
+    Parent = NotifGui,
+    BackgroundTransparency = 1,
+    Position = UDim2.new(0.5, -150, 0, 10),
+    Size = UDim2.new(0, 300, 1, -20)
+})
+
+function AzureUI:Notify(title, message, duration)
+    duration = duration or 4
+    
+    local notif = Create("Frame", {
+        Parent = NotifContainer,
+        BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+        BackgroundTransparency = 0.3,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0.5, -140, 0, -100),
+        Size = UDim2.new(0, 280, 0, 70)
+    })
+    
+    Create("UICorner", {CornerRadius = Theme.CornerRadius, Parent = notif})
+    
+    Create("UIStroke", {
+        Color = Theme.Accent,
+        Thickness = 1.5,
+        Parent = notif
+    })
+    
+    Create("TextLabel", {
+        Parent = notif,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0, 5),
+        Size = UDim2.new(1, -20, 0, 25),
+        Font = Enum.Font.GothamBold,
+        Text = title or "AzureUI",
+        TextColor3 = Theme.Text,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    
+    Create("TextLabel", {
+        Parent = notif,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0, 30),
+        Size = UDim2.new(1, -20, 0, 35),
+        Font = Enum.Font.Gotham,
+        Text = message or "",
+        TextColor3 = Color3.fromRGB(200, 200, 200),
+        TextSize = 14,
+        TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    
+    Tween(notif, {Position = UDim2.new(0.5, -140, 0, 10)}, 0.5, Enum.EasingStyle.Quint)
+    
+    task.delay(duration, function()
+        Tween(notif, {Position = UDim2.new(0.5, -140, 0, -100)}, 0.5)
+        task.wait(0.5)
+        notif:Destroy()
+    end)
+end
+
+-- Window Creation
+function AzureUI:CreateWindow(config)
+    config = config or {}
+    local Window = {}
+    setmetatable(Window, AzureUI)
+    
+    local titleText = config.Title or "AzureUI"
+    local size = config.Size or UDim2.new(0, 800, 0, 450)
+    local minSize = config.MinSize or UDim2.new(0, 600, 0, 350)
+    
+    -- Main ScreenGui
+    Window.Gui = Create("ScreenGui", {
+        Name = "AzureUI_" .. tostring(math.random(1000, 9999)),
+        Parent = CoreGui,
+        ResetOnSpawn = false,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    })
+    
+    -- Main Panel
+    Window.Main = Create("Frame", {
+        Name = "MainPanel",
+        Parent = Window.Gui,
+        BackgroundColor3 = Theme.Background,
+        BackgroundTransparency = Theme.BackgroundTransparency,
+        BorderSizePixel = 0,
+        Position = config.Position or UDim2.new(0.5, -size.X.Offset/2, 0.5, -size.Y.Offset/2),
+        Size = size,
+        ClipsDescendants = true
+    })
+    
+    Create("UICorner", {CornerRadius = Theme.CornerRadius, Parent = Window.Main})
+    Create("UIStroke", {Color = Color3.fromRGB(60, 60, 60), Thickness = 1.5, Parent = Window.Main})
+    
+    -- Title Bar
+    Window.TitleBar = Create("Frame", {
+        Name = "TitleBar",
+        Parent = Window.Main,
+        BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 10, 0, 10),
+        Size = UDim2.new(1, -20, 0, 40)
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = Window.TitleBar})
+    
+    Create("TextLabel", {
+        Parent = Window.TitleBar,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0, 0),
+        Size = UDim2.new(0.7, 0, 1, 0),
+        Font = Enum.Font.GothamBold,
+        Text = titleText,
+        TextColor3 = Theme.Text,
+        TextSize = 20,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    
+    -- Close Button
+    local closeBtn = Create("TextButton", {
+        Parent = Window.TitleBar,
+        BackgroundColor3 = Color3.fromRGB(255, 75, 75),
+        Position = UDim2.new(1, -35, 0.5, -10),
+        Size = UDim2.new(0, 20, 0, 20),
+        Font = Enum.Font.GothamBold,
+        Text = "X",
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        TextSize = 14
+    })
+    Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = closeBtn})
+    
+    -- Minimize Button
+    local minimizeBtn = Create("TextButton", {
+        Parent = Window.TitleBar,
+        BackgroundColor3 = Color3.fromRGB(255, 170, 0),
+        Position = UDim2.new(1, -60, 0.5, -10),
+        Size = UDim2.new(0, 20, 0, 20),
+        Font = Enum.Font.GothamBold,
+        Text = "-",
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        TextSize = 14
+    })
+    Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = minimizeBtn})
+    
+    -- Tab Container (Left Side)
+    Window.TabContainer = Create("Frame", {
+        Name = "Tabs",
+        Parent = Window.Main,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0, 60),
+        Size = UDim2.new(0, 110, 1, -70)
+    })
+    
+    -- Content Area (Right Side)
+    Window.ContentFrame = Create("ScrollingFrame", {
+        Name = "Content",
+        Parent = Window.Main,
+        BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 130, 0, 60),
+        Size = UDim2.new(1, -140, 1, -70),
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        ScrollBarThickness = 6,
+        AutomaticCanvasSize = Enum.AutomaticSize.Y
+    })
+    Create("UICorner", {CornerRadius = Theme.CornerRadius, Parent = Window.ContentFrame})
+    
+    -- Padding for content
+    Create("UIPadding", {
+        Parent = Window.ContentFrame,
+        PaddingLeft = UDim.new(0, 10),
+        PaddingRight = UDim.new(0, 10),
+        PaddingTop = UDim.new(0, 10),
+        PaddingBottom = UDim.new(0, 10)
+    })
+    
+    Create("UIListLayout", {
+        Parent = Window.ContentFrame,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 10)
+    })
+    
+    -- Tab Management
+    Window.Tabs = {}
+    Window.ActiveTab = nil
+    
+    -- Dragging Logic
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    
+    Window.TitleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = Window.Main.Position
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            Window.Main.Position = UDim2.new(
+                startPos.X.Scale, 
+                startPos.X.Offset + delta.X, 
+                startPos.Y.Scale, 
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    
+    -- Close/Minimize
+    closeBtn.MouseButton1Click:Connect(function()
+        Window.Gui:Destroy()
+    end)
+    
+    local minimized = false
+    minimizeBtn.MouseButton1Click:Connect(function()
+        minimized = not minimized
+        Window.ContentFrame.Visible = not minimized
+        Window.TabContainer.Visible = not minimized
+        if minimized then
+            Tween(Window.Main, {Size = UDim2.new(0, size.X.Offset, 0, 60)}, 0.3)
+        else
+            Tween(Window.Main, {Size = size}, 0.3)
+        end
+    end)
+    
+    self:Notify("AzureUI", "Library loaded successfully!", 3)
+    return Window
+end
+
+-- Create Tab Method
+function AzureUI:CreateTab(name)
+    local Window = self
+    local Tab = {}
+    
+    -- Tab Button
+    local tabBtn = Create("TextButton", {
+        Name = name,
+        Parent = Window.TabContainer,
+        BackgroundColor3 = Theme.Secondary,
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 0, 32),
+        Font = Enum.Font.GothamSemibold,
+        Text = name,
+        TextColor3 = Theme.SubText,
+        TextSize = 14,
+        AutoButtonColor = false
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = tabBtn})
+    
+    -- Tab Content (Scrolling Frame for this tab's elements)
+    Tab.Content = Create("ScrollingFrame", {
+        Parent = Window.ContentFrame,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        ScrollBarThickness = 0,
+        Visible = false,
+        AutomaticCanvasSize = Enum.AutomaticSize.Y
+    })
+    
+    Create("UIListLayout", {
+        Parent = Tab.Content,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 8)
+    })
+    
+    -- Tab Logic
+    tabBtn.MouseButton1Click:Connect(function()
+        if Window.ActiveTab == Tab then return end
+        
+        -- Deactivate old tab
+        if Window.ActiveTab then
+            Tween(Window.ActiveTab.Button, {BackgroundColor3 = Theme.Secondary}, 0.3)
+            Window.ActiveTab.Button.TextColor3 = Theme.SubText
+            Window.ActiveTab.Content.Visible = false
+        end
+        
+        -- Activate new tab
+        Window.ActiveTab = Tab
+        Tween(tabBtn, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}, 0.3)
+        tabBtn.TextColor3 = Theme.Text
+        Tab.Content.Visible = true
+    end)
+    
+    Tab.Button = tabBtn
+    
+    -- Auto-select first tab
+    if not Window.ActiveTab then
+        Window.ActiveTab = Tab
+        Tween(tabBtn, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}, 0)
+        tabBtn.TextColor3 = Theme.Text
+        Tab.Content.Visible = true
+    end
+    
+    table.insert(Window.Tabs, Tab)
+    
+    -- Position tab button
+    local index = #Window.Tabs
+    tabBtn.Position = UDim2.new(0, 0, 0, (index - 1) * 38)
+    
+    return Tab
+end
+
+-- Create Section Method
+function AzureUI:CreateSection(title)
+    local Tab = self
+    
+    local section = Create("Frame", {
+        Parent = Tab.Content,
+        BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+        BackgroundTransparency = 0.3,
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 0, 30),
+        AutomaticSize = Enum.AutomaticSize.Y
+    })
+    Create("UICorner", {CornerRadius = Theme.CornerRadius, Parent = section})
+    
+    Create("TextLabel", {
+        Parent = section,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0, 0),
+        Size = UDim2.new(1, -20, 0, 30),
+        Font = Enum.Font.GothamBold,
+        Text = title,
+        TextColor3 = Theme.Text,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    
+    local content = Create("Frame", {
+        Parent = section,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 0, 0, 30),
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y
+    })
+    
+    Create("UIPadding", {
+        Parent = content,
+        PaddingLeft = UDim.new(0, 10),
+        PaddingRight = UDim.new(0, 10),
+        PaddingBottom = UDim.new(0, 10)
+    })
+    
+    Create("UIListLayout", {
+        Parent = content,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 8)
+    })
+    
+    Tab.Content.CanvasSize = UDim2.new(0, 0, 0, Tab.Content.UIListLayout.AbsoluteContentSize.Y)
+    
+    return content
+end
+
+-- Create Toggle Method
+function AzureUI:CreateToggle(config)
+    local Tab = self
+    config = config or {}
+    
+    local toggleFrame = Create("Frame", {
+        Parent = Tab.Content,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 30)
+    })
+    
+    Create("TextLabel", {
+        Parent = toggleFrame,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(0.7, 0, 1, 0),
+        Font = Enum.Font.Gotham,
+        Text = config.Name or "Toggle",
+        TextColor3 = Color3.fromRGB(220, 220, 220),
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    
+    local switch = Create("TextButton", {
+        Parent = toggleFrame,
+        BackgroundColor3 = Theme.ToggleOff,
+        Position = UDim2.new(0.85, 0, 0.5, -10),
+        Size = UDim2.new(0, 40, 0, 20),
+        Text = "",
+        AutoButtonColor = false
+    })
+    Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = switch})
+    
+    local indicator = Create("Frame", {
+        Parent = switch,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        Position = UDim2.new(0, 2, 0.5, -8),
+        Size = UDim2.new(0, 16, 0, 16)
+    })
+    Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = indicator})
+    
+    local enabled = config.Default or false
+    if enabled then
+        switch.BackgroundColor3 = Theme.ToggleOn
+        indicator.Position = UDim2.new(1, -18, 0.5, -8)
+    end
+    
+    switch.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        if enabled then
+            Tween(indicator, {Position = UDim2.new(1, -18, 0.5, -8)}, 0.3)
+            Tween(switch, {BackgroundColor3 = Theme.ToggleOn}, 0.3)
+        else
+            Tween(indicator, {Position = UDim2.new(0, 2, 0.5, -8)}, 0.3)
+            Tween(switch, {BackgroundColor3 = Theme.ToggleOff}, 0.3)
+        end
+        
+        if config.Callback then
+            config.Callback(enabled)
+        end
+    end)
+    
+    return toggleFrame
+end
+
+-- Create Button Method
+function AzureUI:CreateButton(config)
+    local Tab = self
+    config = config or {}
+    
+    local btn = Create("TextButton", {
+        Parent = Tab.Content,
+        BackgroundColor3 = Theme.Accent,
+        Size = UDim2.new(1, 0, 0, 35),
+        Font = Enum.Font.GothamBold,
+        Text = config.Name or "Button",
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        TextSize = 14,
+        AutoButtonColor = false
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
+    
+    btn.MouseButton1Click:Connect(function()
+        Tween(btn, {BackgroundColor3 = Color3.fromRGB(60, 73, 210)}, 0.1)
+        task.wait(0.1)
+        Tween(btn, {BackgroundColor3 = Theme.Accent}, 0.1)
+        
+        if config.Callback then
+            config.Callback()
+        end
+    end)
+    
+    return btn
+end
+
+-- Create Slider Method (Bonus)
+function AzureUI:CreateSlider(config)
+    local Tab = self
+    config = config or {}
+    
+    local sliderFrame = Create("Frame", {
+        Parent = Tab.Content,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 45)
+    })
+    
+    Create("TextLabel", {
+        Parent = sliderFrame,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 20),
+        Font = Enum.Font.Gotham,
+        Text = config.Name or "Slider",
+        TextColor3 = Color3.fromRGB(220, 220, 220),
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    
+    local sliderBg = Create("Frame", {
+        Parent = sliderFrame,
+        BackgroundColor3 = Color3.fromRGB(50, 50, 50),
+        Position = UDim2.new(0, 0, 0, 25),
+        Size = UDim2.new(1, 0, 0, 6)
+    })
+    Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = sliderBg})
+    
+    local fill = Create("Frame", {
+        Parent = sliderBg,
+        BackgroundColor3 = Theme.Accent,
+        Size = UDim2.new(0.5, 0, 1, 0)
+    })
+    Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = fill})
+    
+    local knob = Create("Frame", {
+        Parent = sliderBg,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        Position = UDim2.new(0.5, -6, 0.5, -6),
+        Size = UDim2.new(0, 12, 0, 12)
+    })
+    Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = knob})
+    
+    -- Slider logic simplified (you can expand this)
+    local min = config.Min or 0
+    local max = config.Max or 100
+    local value = config.Default or min
+    
+    local function update(input)
+        local pos = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+        value = min + (pos * (max - min))
+        fill.Size = UDim2.new(pos, 0, 1, 0)
+        knob.Position = UDim2.new(pos, -6, 0.5, -6)
+        if config.Callback then
+            config.Callback(math.floor(value))
+        end
+    end
+    
+    local dragging = false
+    sliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            update(input)
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            update(input)
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    return sliderFrame
+end
+
+-- Create Dropdown Method (Bonus)
+function AzureUI:CreateDropdown(config)
+    local Tab = self
+    config = config or {}
+    
+    local dropdownFrame = Create("Frame", {
+        Parent = Tab.Content,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 35),
+        ClipsDescendants = true
+    })
+    
+    local btn = Create("TextButton", {
+        Parent = dropdownFrame,
+        BackgroundColor3 = Theme.Secondary,
+        Size = UDim2.new(1, 0, 0, 35),
+        Font = Enum.Font.Gotham,
+        Text = (config.Name or "Dropdown") .. " ▼",
+        TextColor3 = Theme.Text,
+        TextSize = 14
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
+    
+    local optionsFrame = Create("Frame", {
+        Parent = dropdownFrame,
+        BackgroundColor3 = Theme.Secondary,
+        Position = UDim2.new(0, 0, 0, 40),
+        Size = UDim2.new(1, 0, 0, 0),
+        Visible = false
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = optionsFrame})
+    
+    local expanded = false
+    btn.MouseButton1Click:Connect(function()
+        expanded = not expanded
+        if expanded then
+            optionsFrame.Visible = true
+            Tween(dropdownFrame, {Size = UDim2.new(1, 0, 0, 40 + (#(config.Options or {}) * 30))}, 0.2)
+        else
+            Tween(dropdownFrame, {Size = UDim2.new(1, 0, 0, 35)}, 0.2)
+            task.wait(0.2)
+            optionsFrame.Visible = false
+        end
+    end)
+    
+    -- Add options
+    if config.Options then
+        for i, option in ipairs(config.Options) do
+            local optBtn = Create("TextButton", {
+                Parent = optionsFrame,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 0, 0, (i-1) * 30),
+                Size = UDim2.new(1, 0, 0, 30),
+                Font = Enum.Font.Gotham,
+                Text = option,
+                TextColor3 = Theme.SubText,
+                TextSize = 14
+            })
+            
+            optBtn.MouseButton1Click:Connect(function()
+                btn.Text = (config.Name or "Dropdown") .. ": " .. option
+                expanded = false
+                Tween(dropdownFrame, {Size = UDim2.new(1, 0, 0, 35)}, 0.2)
+                if config.Callback then
+                    config.Callback(option)
+                end
+            end)
+        end
+    end
+    
+    return dropdownFrame
+end
+
+return AzureUI
