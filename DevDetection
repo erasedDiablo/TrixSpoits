@@ -1,0 +1,43 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local Devs = {
+"UzuKee","BLOODTARO","Dxscape","Myst_Ari","eurycIea",
+"v_cks","ezguap","Tsuzutou","ReferToWithered","Illus0",
+"Pyreiz","VoidedFlame","ROUXABOUT","mixeriiiiiing",
+"MichDrajo","hayst4","ElmoNYC","Core_CorruptionF",
+"Brillcake","AxionTheRevenant","sammyj0n","ViveLesPatat",
+"Zimvasion","vertiify","redfoxP","cakesucker05",
+"00kamiMio","itscanii","SirDeviloper","0nkka",
+"Ramdharam","Olliebutheskenny","cswag_code","TwoGio",
+"KoleRTX2","Wilpuri","remendyy","SpaceNuggies",
+"CrimsonBeheIit","warycoolio"
+}
+
+local devSet = {}
+for _, name in ipairs(Devs) do
+devSet[name:lower()] = true
+end
+
+local function isDev(player)
+return devSet[player.Name:lower()] or devSet[player.DisplayName:lower()]
+end
+
+local function kickNow()
+pcall(function()
+LocalPlayer:Kick("Disconnected from server")
+end)
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+if player ~= LocalPlayer and isDev(player) then
+kickNow()
+return
+end
+end
+
+Players.PlayerAdded:Connect(function(player)
+if isDev(player) then
+kickNow()
+end
+end)
